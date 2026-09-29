@@ -1,5 +1,5 @@
 /**
- * The filesystem primitives, and the guard that proves localrepo kept its
+ * The filesystem primitives, and the guard that proves localize kept its
  * promise.
  *
  * The link is written with `fs.symlink` and never by invoking npm. Two
@@ -111,7 +111,7 @@ export function scanLinks(appRoot) {
 // the post-condition
 // ---------------------------------------------------------------------------
 
-/** The files no localrepo command may ever touch. */
+/** The files no localize command may ever touch. */
 export const MANIFEST_FILES = ['package.json', 'package-lock.json'];
 
 /**

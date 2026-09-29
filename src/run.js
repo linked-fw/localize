@@ -1,7 +1,7 @@
 import {spawnSync} from 'node:child_process';
 
 /**
- * The single seam through which localrepo reaches the outside world.
+ * The single seam through which localize reaches the outside world.
  *
  * Every subprocess -- `git`, `npm`, a configured build command -- goes through
  * the `run` function on the deps object. Tests may replace it, but note that

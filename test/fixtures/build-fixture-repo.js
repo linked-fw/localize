@@ -26,10 +26,10 @@ const git = (cwd, ...args) =>
     encoding: 'utf8',
     env: {
       ...process.env,
-      GIT_AUTHOR_NAME: 'localrepo tests',
-      GIT_AUTHOR_EMAIL: 'tests@localrepo.invalid',
-      GIT_COMMITTER_NAME: 'localrepo tests',
-      GIT_COMMITTER_EMAIL: 'tests@localrepo.invalid',
+      GIT_AUTHOR_NAME: 'localize tests',
+      GIT_AUTHOR_EMAIL: 'tests@localize.invalid',
+      GIT_COMMITTER_NAME: 'localize tests',
+      GIT_COMMITTER_EMAIL: 'tests@localize.invalid',
     },
   });
 

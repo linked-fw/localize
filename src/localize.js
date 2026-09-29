@@ -32,7 +32,7 @@ import {
   EXIT_MANIFEST_DIRTY,
   EXIT_REFUSED,
   EXIT_WARNED,
-  LocalpkgError,
+  LocalizeError,
 } from './errors.js';
 import {DEFAULT_DIR, SCHEMA_VERSION, readManifest, writeManifest} from './manifest.js';
 import {resolvePackage} from './resolve.js';
@@ -113,10 +113,10 @@ function localizeOne(name, dir, recorded, opts, deps) {
     if (code === EXIT_WARNED) return {code}; // a non-fast-forward is reported, never forced
   } else {
     fs.mkdirSync(path.dirname(clone), {recursive: true});
-    deps.log(`[localrepo] cloning ${resolved.repo} -> ${relClone}`);
+    deps.log(`[localize] cloning ${resolved.repo} -> ${relClone}`);
     const r = deps.run('git', ['clone', resolved.repo, clone]);
     if (r.status !== 0) {
-      throw new LocalpkgError(
+      throw new LocalizeError(
         `git clone ${resolved.repo} failed:\n${(r.stderr || r.stdout).trim()}`,
         EXIT_REFUSED,
       );
@@ -124,12 +124,12 @@ function localizeOne(name, dir, recorded, opts, deps) {
   }
 
   if (!fs.existsSync(path.join(pkgDir, 'package.json'))) {
-    throw new LocalpkgError(
+    throw new LocalizeError(
       `${relPkg} has no package.json, so it is not the package "${name}".\n` +
         (resolved.subdir
           ? `The registry says "${name}" lives in "${resolved.subdir}" of ${resolved.repo}, and it does not.`
           : `${resolved.repo} looks like a monorepo root. Say where the package lives:\n` +
-            `  localrepo ${name} --repo ${resolved.repo} --subdir <path-inside-the-repo>`),
+            `  linked-localize ${name} --repo ${resolved.repo} --subdir <path-inside-the-repo>`),
       EXIT_REFUSED,
     );
   }
@@ -138,28 +138,28 @@ function localizeOne(name, dir, recorded, opts, deps) {
   // mismatch means the symlink would be written under a name nothing imports.
   const declared = readJson(path.join(pkgDir, 'package.json'))?.name;
   if (declared && declared !== resolved.npmName) {
-    throw new LocalpkgError(
+    throw new LocalizeError(
       `${relPkg} declares itself as "${declared}", not "${name}".\n` +
         (resolved.subdir
           ? `The registry's repository.directory for "${name}" points at the wrong package.`
           : `${resolved.repo} is probably a monorepo. Point at the right directory:\n` +
-            `  localrepo ${name} --repo ${resolved.repo} --subdir <path-inside-the-repo>`),
+            `  linked-localize ${name} --repo ${resolved.repo} --subdir <path-inside-the-repo>`),
       EXIT_REFUSED,
     );
   }
 
   // THE constraint. Read the module header before changing this.
-  deps.log(`[localrepo] npm install in ${relPkg}`);
+  deps.log(`[localize] npm install in ${relPkg}`);
   const install = deps.run('npm', ['install', '--no-audit', '--no-fund'], {cwd: pkgDir});
   if (install.status !== 0) {
-    throw new LocalpkgError(
+    throw new LocalizeError(
       `npm install failed in ${relPkg}:\n${(install.stderr || install.stdout).trim()}\n` +
         `The checkout is left on disk. Nothing was linked and nothing was recorded.`,
       EXIT_INSTALL_FAILED,
     );
   }
 
-  // The build is the one thing localrepo does not know how to do, so it is
+  // The build is the one thing localize does not know how to do, so it is
   // configuration rather than behaviour. A failure is a WARNING: a package
   // whose build is broken is exactly what you are about to fix, and refusing
   // to link it would be perverse.
@@ -167,7 +167,7 @@ function localizeOne(name, dir, recorded, opts, deps) {
 
   writeLink(deps.appRoot, resolved.npmName, pkgDir);
   const branch = currentBranch(clone, deps);
-  deps.log(`[localrepo] linked ${resolved.npmName} -> ${relPkg} (branch ${branch})`);
+  deps.log(`[localize] linked ${resolved.npmName} -> ${relPkg} (branch ${branch})`);
 
   const range = declaredRange(resolved.npmName, deps);
   return {
@@ -199,13 +199,13 @@ function refresh(relPath, clone, deps) {
   const status = deps.run('git', ['status', '--porcelain'], {cwd: clone});
   const modified = status.stdout.split('\n').filter((l) => l.trim()).length;
   if (modified > 0) {
-    deps.log(`[localrepo] ${relPath}: ${modified} modified file${modified === 1 ? '' : 's'} — not pulling`);
+    deps.log(`[localize] ${relPath}: ${modified} modified file${modified === 1 ? '' : 's'} — not pulling`);
     return 0;
   }
   const pull = deps.run('git', ['pull', '--ff-only'], {cwd: clone});
   if (pull.status !== 0) {
     deps.warn(
-      `[localrepo] ${relPath}: \`git pull --ff-only\` failed (not a fast-forward) — skipped, not ` +
+      `[localize] ${relPath}: \`git pull --ff-only\` failed (not a fast-forward) — skipped, not ` +
         `forced. Reconcile it by hand:\n${(pull.stderr || pull.stdout).trim()}`,
     );
     return EXIT_WARNED;
@@ -216,7 +216,7 @@ function refresh(relPath, clone, deps) {
 /**
  * Run the configured build command, if there is one.
  *
- * localrepo has no opinion about how a checkout is built, and does not look for
+ * localize has no opinion about how a checkout is built, and does not look for
  * a builder. `--build "<cmd>"`, or a `build` field in the manifest, or
  * `{build}` in the programmatic options. Absent -- the common case, and the
  * case for anything whose dev loop reads source directly -- nothing runs and
@@ -225,11 +225,11 @@ function refresh(relPath, clone, deps) {
 function runBuild(relPath, pkgDir, opts, deps) {
   const cmd = opts.build;
   if (!cmd) return 'skipped';
-  deps.log(`[localrepo] ${relPath}: ${cmd}`);
+  deps.log(`[localize] ${relPath}: ${cmd}`);
   const r = deps.run(cmd, [], {cwd: pkgDir, shell: true});
   if (r.status !== 0) {
     deps.warn(
-      `[localrepo] ${relPath}: \`${cmd}\` failed. The package is linked and recorded anyway — ` +
+      `[localize] ${relPath}: \`${cmd}\` failed. The package is linked and recorded anyway — ` +
         `a package whose build is broken is exactly what you are about to fix.\n` +
         `${(r.stderr || r.stdout).trim()}`,
     );
@@ -250,10 +250,10 @@ function guardForeignLink(npmName, dir, opts, deps) {
   }
   if (isInside(target, path.join(deps.appRoot, dir))) return;
   if (opts.force) {
-    deps.warn(`[localrepo] --force: overwriting the existing link ${npmName} -> ${target}`);
+    deps.warn(`[localize] --force: overwriting the existing link ${npmName} -> ${target}`);
     return;
   }
-  throw new LocalpkgError(
+  throw new LocalizeError(
     `node_modules/${npmName} is already a symlink to ${target}, which is outside ${dir}.\n` +
       `Refusing to overwrite someone else's link. Pass --force to replace it.`,
     EXIT_REFUSED,
@@ -267,14 +267,14 @@ function assertLinked(entries, deps) {
     const link = path.join(deps.appRoot, 'node_modules', name);
     const expected = path.join(deps.appRoot, entry.path);
     if (!isSymlink(link)) {
-      deps.warn(`[localrepo] ${name} is recorded but node_modules/${name} is not a symlink.`);
+      deps.warn(`[localize] ${name} is recorded but node_modules/${name} is not a symlink.`);
       code = Math.max(code, EXIT_WARNED);
       continue;
     }
     if (!fs.existsSync(expected)) continue; // "checkout missing" is a --list state, not a failure
     if (fs.realpathSync(link) !== fs.realpathSync(expected)) {
       deps.warn(
-        `[localrepo] ${name} links to ${fs.realpathSync(link)} but the manifest records ${entry.path}.`,
+        `[localize] ${name} links to ${fs.realpathSync(link)} but the manifest records ${entry.path}.`,
       );
       code = Math.max(code, EXIT_WARNED);
     }
@@ -294,17 +294,17 @@ export function assertManifestsUntouched(before, deps) {
   const changed = diffManifests(before, snapshotManifests(deps.appRoot));
   if (!changed.length) return 0;
   deps.error(
-    `[localrepo] the consumer's manifests changed while this command ran:\n` +
+    `[localize] the consumer's manifests changed while this command ran:\n` +
       changed.map((c) => `  ${c}`).join('\n') +
-      `\nThis is the exact failure localrepo exists to prevent. Revert those files; nothing in ` +
-      `localrepo is supposed to touch them.`,
+      `\nThis is the exact failure localize exists to prevent. Revert those files; nothing in ` +
+      `localize is supposed to touch them.`,
   );
   return EXIT_MANIFEST_DIRTY;
 }
 
 export function reportError(e, deps) {
-  if (e instanceof LocalpkgError) {
-    deps.error(`[localrepo] ${e.message}`);
+  if (e instanceof LocalizeError) {
+    deps.error(`[localize] ${e.message}`);
     return e.code;
   }
   throw e;

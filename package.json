@@ -1,5 +1,5 @@
 {
-  "name": "localrepo",
+  "name": "@_linked/localize",
   "version": "0.1.0",
   "description": "Develop an npm dependency from a git checkout: resolve the package's repository from the registry, clone it, install inside the checkout, and symlink it into node_modules -- without touching package.json or package-lock.json.",
   "keywords": [
@@ -16,16 +16,19 @@
   "author": "Semantu",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/linked-fw/localrepo.git"
+    "url": "git+https://github.com/linked-fw/localize.git"
   },
-  "homepage": "https://github.com/linked-fw/localrepo#readme",
-  "bugs": "https://github.com/linked-fw/localrepo/issues",
+  "homepage": "https://github.com/linked-fw/localize#readme",
+  "bugs": "https://github.com/linked-fw/localize/issues",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "engines": {
     "node": ">=18.17"
   },
   "bin": {
-    "localrepo": "bin/localrepo.js"
+    "linked-localize": "bin/linked-localize.js"
   },
   "exports": {
     ".": "./src/index.js",

@@ -22,7 +22,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import {EXIT_BAD_FILE, LocalpkgError} from './errors.js';
+import {EXIT_BAD_FILE, LocalizeError} from './errors.js';
 
 export const MANIFEST_FILENAME = 'local-packages.json';
 
@@ -43,7 +43,7 @@ export function manifestPath(appRoot) {
  * and reads as an empty set. That is also why no `if (CI)` branch exists
  * anywhere in this package -- the file is gitignored, so CI is a natural no-op.
  *
- * @throws {LocalpkgError} code 3. Nothing is written in any failure case.
+ * @throws {LocalizeError} code 3. Nothing is written in any failure case.
  */
 export function readManifest(appRoot, io = {warn: console.warn}) {
   const file = manifestPath(appRoot);
@@ -57,7 +57,7 @@ export function readManifest(appRoot, io = {warn: console.warn}) {
   try {
     parsed = JSON.parse(raw);
   } catch (e) {
-    throw new LocalpkgError(
+    throw new LocalizeError(
       `${file} is not valid JSON: ${e.message}\n` +
         `Refusing to read or rewrite it -- it is the only record of what was localized. ` +
         `Fix it by hand, or delete it to start over.`,
@@ -66,7 +66,7 @@ export function readManifest(appRoot, io = {warn: console.warn}) {
   }
 
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new LocalpkgError(
+    throw new LocalizeError(
       `${file} does not contain a JSON object.\n` +
         `Refusing to read or rewrite it. Expected {"version":${SCHEMA_VERSION},"packages":{…}}.`,
       EXIT_BAD_FILE,
@@ -74,17 +74,17 @@ export function readManifest(appRoot, io = {warn: console.warn}) {
   }
 
   if (parsed.version !== SCHEMA_VERSION) {
-    throw new LocalpkgError(
-      `${file} has schema version ${JSON.stringify(parsed.version)}; this localrepo understands ` +
+    throw new LocalizeError(
+      `${file} has schema version ${JSON.stringify(parsed.version)}; this version of localize understands ` +
         `only version ${SCHEMA_VERSION}.\n` +
         `Refusing to read or rewrite it -- guessing at a schema it did not write is how intent ` +
-        `gets lost. Upgrade localrepo, or delete the file and re-localize.`,
+        `gets lost. Upgrade localize, or delete the file and re-localize.`,
       EXIT_BAD_FILE,
     );
   }
 
   if (parsed.packages === null || typeof parsed.packages !== 'object' || Array.isArray(parsed.packages)) {
-    throw new LocalpkgError(
+    throw new LocalizeError(
       `${file} has a "packages" field that is not an object (found ` +
         `${Array.isArray(parsed.packages) ? 'an array' : typeof parsed.packages}).\n` +
         `Refusing to read or rewrite it.`,
@@ -102,8 +102,8 @@ export function readManifest(appRoot, io = {warn: console.warn}) {
     if (reason) {
       malformed.push({name, reason});
       io.warn(
-        `[localrepo] ${name}: malformed entry in ${MANIFEST_FILENAME} (${reason}) -- skipped. ` +
-          `The other entries are unaffected. \`localrepo ${name}\` rewrites it.`,
+        `[localize] ${name}: malformed entry in ${MANIFEST_FILENAME} (${reason}) -- skipped. ` +
+          `The other entries are unaffected. \`linked-localize ${name}\` rewrites it.`,
       );
       continue;
     }

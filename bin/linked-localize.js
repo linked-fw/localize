@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * localrepo's command line.
+ * localize's command line.
  *
- * Hand-rolled argument parsing rather than a parser dependency: localrepo has
+ * Hand-rolled argument parsing rather than a parser dependency: localize has
  * no dependencies at all, which is worth more to a build tool than the few
  * lines this saves. `node:util`'s parseArgs is not used either, because its
  * strict mode rejects the `--` free-form values people type and its error
@@ -17,13 +17,13 @@ import {list} from '../src/list.js';
 import {relink} from '../src/relink.js';
 
 const USAGE = `
-localrepo — develop an npm dependency from a git checkout.
+localize — develop an npm dependency from a git checkout.
 
-  localrepo <package…> [options]     clone, install inside the checkout, symlink it in
-  localrepo --list [--check]         report what is localized, and whether it really is
-  localrepo --relink                 recreate the recorded symlinks (use from postinstall)
-  localrepo remove <package…>        undo: unlink and forget, keeping the checkout
-  localrepo remove                   undo every localized package
+  linked-localize <package…> [options]     clone, install inside the checkout, symlink it in
+  linked-localize --list [--check]         report what is localized, and whether it really is
+  linked-localize --relink                 recreate the recorded symlinks (use from postinstall)
+  linked-localize remove <package…>        undo: unlink and forget, keeping the checkout
+  linked-localize remove                   undo every localized package
 
 Packages are named exactly as npm names them: \`lodash\`, \`@scope/thing\`.
 The repository is read from the package's published \`repository\` field.
@@ -62,7 +62,7 @@ function parse(argv) {
     } else if (FLAGS.has(a)) {
       opts[a.replace(/^-+/, '')] = true;
     } else if (a.startsWith('-')) {
-      fatal(`unknown option ${a}. \`localrepo --help\` for the list.`);
+      fatal(`unknown option ${a}. \`linked-localize --help\` for the list.`);
     } else {
       names.push(a);
     }
@@ -71,7 +71,7 @@ function parse(argv) {
 }
 
 function fatal(msg) {
-  console.error(`[localrepo] ${msg}`);
+  console.error(`[localize] ${msg}`);
   process.exit(2);
 }
 

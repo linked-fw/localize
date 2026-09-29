@@ -1,5 +1,5 @@
 /**
- * The two promises localrepo makes to the consumer, tested as promises rather
+ * The two promises localize makes to the consumer, tested as promises rather
  * than as implementation:
  *
  *   1. it never changes package.json or package-lock.json, and says so loudly
@@ -16,7 +16,7 @@ import {fileURLToPath} from 'node:url';
 import {localize} from '../src/localize.js';
 import {makeConsumer, ok, rm, stubbed} from './helpers.js';
 
-const BIN = fileURLToPath(new URL('../bin/localrepo.js', import.meta.url));
+const BIN = fileURLToPath(new URL('../bin/linked-localize.js', import.meta.url));
 
 const consumer = (t, pkg) => {
   const root = makeConsumer({pkg});
@@ -44,7 +44,7 @@ test('a manifest changed during the run is exit 8, even when the work succeeded'
 
   assert.equal(localize(['widget'], {repo: 'r'}, deps), 8);
   assert.match(deps.output(), /package-lock\.json \(created\)/);
-  assert.match(deps.output(), /the exact failure localrepo exists to prevent/);
+  assert.match(deps.output(), /the exact failure localize exists to prevent/);
 });
 
 test('an uncommitted package.json is NOT a failure', (t) => {
@@ -70,7 +70,7 @@ test('an uncommitted package.json is NOT a failure', (t) => {
 
 test('the CLI is self-describing and exits 0 on --help and --version', () => {
   const help = execFileSync(process.execPath, [BIN, '--help'], {encoding: 'utf8'});
-  for (const expected of ['localrepo <package…>', '--relink', '--subdir', '--build', 'Exit codes']) {
+  for (const expected of ['linked-localize <package…>', '--relink', '--subdir', '--build', 'Exit codes']) {
     assert.ok(help.includes(expected), `--help mentions ${expected}`);
   }
   assert.match(execFileSync(process.execPath, [BIN, '--version'], {encoding: 'utf8'}), /^\d+\.\d+\.\d+/);
@@ -89,7 +89,7 @@ test('the CLI in a tree with nothing localized is silent and exits 0', (t) => {
   assert.equal(out, '');
 });
 
-test('`localrepo --relink` from a postinstall is a no-op with no manifest', (t) => {
+test('`linked-localize --relink` from a postinstall is a no-op with no manifest', (t) => {
   const appRoot = consumer(t);
   const out = execFileSync(process.execPath, [BIN, '--relink'], {cwd: appRoot, encoding: 'utf8'});
   assert.equal(out, '');

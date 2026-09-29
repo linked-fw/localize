@@ -11,17 +11,17 @@
  * wrong here costs a clone and a full install of the wrong repository.
  *
  * A consumer that wants to accept short names, or to search several GitHub
- * orgs, resolves that to a full package name ITSELF and then calls localrepo.
- * That behaviour is specific to whoever has it, and localrepo deliberately
+ * orgs, resolves that to a full package name ITSELF and then calls localize.
+ * That behaviour is specific to whoever has it, and localize deliberately
  * offers no seam for it.
  *
  * Metadata is read with `npm view`, not with an HTTP request to
  * registry.npmjs.org, so a private registry, a scoped registry, a proxy and an
- * auth token all work without localrepo knowing any of them exist.
+ * auth token all work without localize knowing any of them exist.
  */
 import path from 'node:path';
 
-import {EXIT_NOT_FOUND, LocalpkgError} from './errors.js';
+import {EXIT_NOT_FOUND, LocalizeError} from './errors.js';
 
 /**
  * @typedef {object} Resolved
@@ -39,7 +39,7 @@ import {EXIT_NOT_FOUND, LocalpkgError} from './errors.js';
  * @param {object} [override]  `{repo, subdir}` from `--repo`/`--subdir` or from
  *   a manifest entry recorded by an earlier run
  * @returns {Resolved}
- * @throws {LocalpkgError} code 4 when the registry has no usable `repository`.
+ * @throws {LocalizeError} code 4 when the registry has no usable `repository`.
  */
 export function resolvePackage(name, deps, override) {
   if (override?.repo) {
@@ -66,11 +66,11 @@ export function resolvePackage(name, deps, override) {
 function fetchMetadata(name, deps) {
   const r = deps.run('npm', ['view', name, 'repository', 'name', '--json']);
   if (r.status !== 0) {
-    throw new LocalpkgError(
+    throw new LocalizeError(
       `cannot read registry metadata for "${name}":\n${(r.stderr || r.stdout).trim()}\n` +
-        `localrepo resolves a repository only from the published package. If the package is not ` +
+        `localize resolves a repository only from the published package. If the package is not ` +
         `published, or you are not authenticated for its registry, pass the repository ` +
-        `explicitly:  localrepo ${name} --repo <git-url>`,
+        `explicitly:  linked-localize ${name} --repo <git-url>`,
       EXIT_NOT_FOUND,
     );
   }
@@ -81,7 +81,7 @@ function fetchMetadata(name, deps) {
   try {
     return JSON.parse(r.stdout);
   } catch (e) {
-    throw new LocalpkgError(
+    throw new LocalizeError(
       `npm returned metadata for "${name}" that is not JSON (${e.message}).`,
       EXIT_NOT_FOUND,
     );
@@ -106,10 +106,10 @@ function readRepositoryField(meta, name) {
   if (node && typeof node === 'object' && 'repository' in node) node = node.repository;
 
   const missing = () =>
-    new LocalpkgError(
+    new LocalizeError(
       `"${name}" publishes no usable "repository" field, so there is nothing to clone.\n` +
-        `localrepo never guesses at a repository URL. Pass it once:\n` +
-        `  localrepo ${name} --repo <git-url> [--subdir <path-inside-the-repo>]\n` +
+        `localize never guesses at a repository URL. Pass it once:\n` +
+        `  linked-localize ${name} --repo <git-url> [--subdir <path-inside-the-repo>]\n` +
         `It is recorded in local-packages.json, so you only pass it the first time.`,
       EXIT_NOT_FOUND,
     );
@@ -153,7 +153,7 @@ function normalizeSubdir(dir) {
   const clean = path.posix.normalize(dir.replace(/\\/g, '/')).replace(/^\.\//, '').replace(/\/+$/, '');
   if (clean === '.' || clean === '') return undefined;
   if (clean.startsWith('..') || path.posix.isAbsolute(clean)) {
-    throw new LocalpkgError(
+    throw new LocalizeError(
       `the package directory "${dir}" points outside the repository. Refusing to use it.`,
       EXIT_NOT_FOUND,
     );

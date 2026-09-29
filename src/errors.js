@@ -1,11 +1,11 @@
 /**
- * Every refusal in localrepo throws a LocalpkgError carrying an exit code, so
+ * Every refusal in localize throws a LocalizeError carrying an exit code, so
  * callers can branch on `.code` rather than matching on a message.
  *
  * The codes are a public contract: scripts depend on them.
  */
 
-/** The manifest file is unusable and localrepo refuses to touch it. */
+/** The manifest file is unusable and localize refuses to touch it. */
 export const EXIT_BAD_FILE = 3;
 /** No git repository could be resolved for the package name. */
 export const EXIT_NOT_FOUND = 4;
@@ -18,10 +18,10 @@ export const EXIT_INSTALL_FAILED = 7;
 /** package.json / package-lock.json changed -- the failure this tool exists to prevent. */
 export const EXIT_MANIFEST_DIRTY = 8;
 
-export class LocalpkgError extends Error {
+export class LocalizeError extends Error {
   constructor(message, code) {
     super(message);
-    this.name = 'LocalpkgError';
+    this.name = 'LocalizeError';
     this.code = code;
   }
 }

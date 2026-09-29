@@ -1,5 +1,5 @@
 /**
- * localrepo's programmatic API.
+ * localize's programmatic API.
  *
  * Every function takes `deps` -- `{appRoot, run, log, warn, error}` -- so a
  * caller can point it at another root or capture its output. `defaultDeps()`
@@ -13,7 +13,7 @@ export {resolvePackage, normalizeGitUrl, checkoutNameFor} from './resolve.js';
 export {readManifest, writeManifest, manifestPath, MANIFEST_FILENAME, SCHEMA_VERSION, DEFAULT_DIR} from './manifest.js';
 export {defaultDeps, makeRun} from './run.js';
 export {
-  LocalpkgError,
+  LocalizeError,
   EXIT_BAD_FILE,
   EXIT_NOT_FOUND,
   EXIT_WARNED,

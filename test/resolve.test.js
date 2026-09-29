@@ -61,7 +61,7 @@ test('a missing repository field is a refusal naming --repo, never a guess', (t)
     (e) => {
       assert.equal(e.code, EXIT_NOT_FOUND);
       assert.match(e.message, /publishes no usable "repository" field/);
-      assert.match(e.message, /localrepo orphan --repo <git-url>/);
+      assert.match(e.message, /linked-localize orphan --repo <git-url>/);
       assert.match(e.message, /never guesses/);
       return true;
     },

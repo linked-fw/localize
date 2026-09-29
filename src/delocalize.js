@@ -8,7 +8,7 @@
  * `--purge` deletes it, and refuses on uncommitted changes or unpushed commits
  * unless `--force`.
  *
- * The restore command is PRINTED, not run. localrepo never invokes an install
+ * The restore command is PRINTED, not run. localize never invokes an install
  * at the consumer root -- that is the rule the whole design rests on, and it
  * does not get an exception for the convenient case. The printed line carries
  * `--no-save`, which is load-bearing rather than tidy: a plain
@@ -43,7 +43,7 @@ export function delocalize(names, opts, deps) {
   for (const name of targets) {
     const entry = entries[name];
     if (!entry) {
-      deps.warn(`[localrepo] ${name} is not recorded — nothing to do.`);
+      deps.warn(`[localize] ${name} is not recorded — nothing to do.`);
       code = Math.max(code, EXIT_WARNED);
       continue;
     }
@@ -54,21 +54,21 @@ export function delocalize(names, opts, deps) {
     if (opts.purge) {
       const refusal = purgeRefusal(checkout, deps);
       if (refusal && !opts.force) {
-        deps.warn(`[localrepo] ${entry.path}: not deleting — ${refusal}. Pass --force to delete it anyway.`);
+        deps.warn(`[localize] ${entry.path}: not deleting — ${refusal}. Pass --force to delete it anyway.`);
         code = Math.max(code, EXIT_WARNED);
       } else {
-        if (refusal) deps.warn(`[localrepo] --force: deleting ${entry.path} despite ${refusal}`);
+        if (refusal) deps.warn(`[localize] --force: deleting ${entry.path} despite ${refusal}`);
         fs.rmSync(checkout, {recursive: true, force: true});
-        deps.log(`[localrepo] removed ${entry.path}`);
+        deps.log(`[localize] removed ${entry.path}`);
       }
     } else if (fs.existsSync(checkout)) {
-      deps.log(`[localrepo] ${entry.path} left on disk (uncommitted work lives there). --purge removes it.`);
+      deps.log(`[localize] ${entry.path} left on disk (uncommitted work lives there). --purge removes it.`);
     }
 
     delete entries[name];
 
     const range = entry.range ?? declaredRange(name, deps) ?? 'latest';
-    deps.log(`[localrepo] restore the registry copy with:  npm install --no-save ${name}@${range}`);
+    deps.log(`[localize] restore the registry copy with:  npm install --no-save ${name}@${range}`);
   }
 
   writeManifest(deps.appRoot, {version: SCHEMA_VERSION, dir, packages: entries});
@@ -82,7 +82,7 @@ function unlink(name, dir, deps) {
 
   if (!isSymlink(link)) {
     deps.warn(
-      `[localrepo] node_modules/${name} is a real directory, not a link — left alone. ` +
+      `[localize] node_modules/${name} is a real directory, not a link — left alone. ` +
         `That is the registry copy; nothing to unlink.`,
     );
     return EXIT_WARNED;
@@ -93,20 +93,20 @@ function unlink(name, dir, deps) {
     target = fs.realpathSync(link);
   } catch {
     fs.unlinkSync(link); // dangling, and ours by elimination
-    deps.log(`[localrepo] unlinked ${name} (its target was already gone)`);
+    deps.log(`[localize] unlinked ${name} (its target was already gone)`);
     return 0;
   }
 
   if (!isInside(target, path.join(deps.appRoot, dir))) {
     deps.warn(
-      `[localrepo] node_modules/${name} links to ${target}, outside ${dir} — left alone. ` +
+      `[localize] node_modules/${name} links to ${target}, outside ${dir} — left alone. ` +
         `delocalize only removes links it could have made.`,
     );
     return EXIT_WARNED;
   }
 
   fs.unlinkSync(link);
-  deps.log(`[localrepo] unlinked ${name}`);
+  deps.log(`[localize] unlinked ${name}`);
   return 0;
 }
 
