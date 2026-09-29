@@ -37,7 +37,7 @@ import {buildFixtureRepo} from './fixtures/build-fixture-repo.js';
 import {makeConsumer, realDeps, rm, tmpdir} from './helpers.js';
 
 test('slow: a real localize clones, installs inside the checkout and links it', async (t) => {
-  const scratch = tmpdir('localpkg-fixture-');
+  const scratch = tmpdir('localrepo-fixture-');
   const {repoUrl, depName, name} = buildFixtureRepo(scratch);
   const appRoot = makeConsumer({pkg: {dependencies: {[name]: '^1.0.0'}}});
   t.after(() => {
@@ -125,7 +125,7 @@ test('slow: a real localize clones, installs inside the checkout and links it', 
 });
 
 test('slow: a real localize of a package inside a monorepo installs in the package directory', (t) => {
-  const scratch = tmpdir('localpkg-fixture-');
+  const scratch = tmpdir('localrepo-fixture-');
   const {repoUrl, depName, name} = buildFixtureRepo(scratch, {subdir: 'packages/widget'});
   const appRoot = makeConsumer();
   t.after(() => {
@@ -156,7 +156,7 @@ test('slow: a real localize of a package inside a monorepo installs in the packa
 });
 
 test('slow: a real localize refuses a monorepo root rather than linking the wrong package', (t) => {
-  const scratch = tmpdir('localpkg-fixture-');
+  const scratch = tmpdir('localrepo-fixture-');
   const {repoUrl, name} = buildFixtureRepo(scratch, {subdir: 'packages/widget'});
   const appRoot = makeConsumer();
   t.after(() => {

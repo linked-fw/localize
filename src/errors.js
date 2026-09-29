@@ -1,11 +1,11 @@
 /**
- * Every refusal in localpkg throws a LocalpkgError carrying an exit code, so
+ * Every refusal in localrepo throws a LocalpkgError carrying an exit code, so
  * callers can branch on `.code` rather than matching on a message.
  *
  * The codes are a public contract: scripts depend on them.
  */
 
-/** The manifest file is unusable and localpkg refuses to touch it. */
+/** The manifest file is unusable and localrepo refuses to touch it. */
 export const EXIT_BAD_FILE = 3;
 /** No git repository could be resolved for the package name. */
 export const EXIT_NOT_FOUND = 4;

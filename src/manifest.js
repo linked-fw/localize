@@ -75,10 +75,10 @@ export function readManifest(appRoot, io = {warn: console.warn}) {
 
   if (parsed.version !== SCHEMA_VERSION) {
     throw new LocalpkgError(
-      `${file} has schema version ${JSON.stringify(parsed.version)}; this localpkg understands ` +
+      `${file} has schema version ${JSON.stringify(parsed.version)}; this localrepo understands ` +
         `only version ${SCHEMA_VERSION}.\n` +
         `Refusing to read or rewrite it -- guessing at a schema it did not write is how intent ` +
-        `gets lost. Upgrade localpkg, or delete the file and re-localize.`,
+        `gets lost. Upgrade localrepo, or delete the file and re-localize.`,
       EXIT_BAD_FILE,
     );
   }
@@ -102,8 +102,8 @@ export function readManifest(appRoot, io = {warn: console.warn}) {
     if (reason) {
       malformed.push({name, reason});
       io.warn(
-        `[localpkg] ${name}: malformed entry in ${MANIFEST_FILENAME} (${reason}) -- skipped. ` +
-          `The other entries are unaffected. \`localpkg ${name}\` rewrites it.`,
+        `[localrepo] ${name}: malformed entry in ${MANIFEST_FILENAME} (${reason}) -- skipped. ` +
+          `The other entries are unaffected. \`localrepo ${name}\` rewrites it.`,
       );
       continue;
     }

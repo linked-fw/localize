@@ -40,7 +40,7 @@ function link(appRoot, name, target) {
 
 test('a symlink pointing outside the checkout dir is refused, and --force overrides', (t) => {
   const appRoot = consumer(t);
-  const foreign = tmpdir('localpkg-foreign-');
+  const foreign = tmpdir('localrepo-foreign-');
   t.after(() => rm(foreign));
   fs.writeFileSync(path.join(foreign, 'package.json'), JSON.stringify({name: 'widget', version: '1.0.0'}));
   link(appRoot, 'widget', foreign);
@@ -122,7 +122,7 @@ test('a configured build failure warns and still links; no build command runs no
   assert.equal(
     noBuild.calls.some((c) => /build/.test(c.cmd)),
     false,
-    'localpkg does not look for a builder of its own',
+    'localrepo does not look for a builder of its own',
   );
 });
 
@@ -135,7 +135,7 @@ test('--list distinguishes the four states, and --check fails only on the costly
   const linkedCheckout = seedCheckout(appRoot, 'linked-one');
   link(appRoot, 'linked-one', linkedCheckout);
   seedCheckout(appRoot, 'not-linked-one'); // checkout present, no symlink: what `npm ci` leaves
-  const untrackedTarget = tmpdir('localpkg-untracked-');
+  const untrackedTarget = tmpdir('localrepo-untracked-');
   t.after(() => rm(untrackedTarget));
   link(appRoot, 'untracked-one', untrackedTarget);
 
@@ -189,7 +189,7 @@ test('delocalize keeps the checkout, prints --no-save, and forgets the entry', (
 test('delocalize leaves a real directory and a foreign link alone', (t) => {
   const appRoot = consumer(t);
   fs.mkdirSync(path.join(appRoot, 'node_modules', 'realdir'), {recursive: true});
-  const foreign = tmpdir('localpkg-foreign-');
+  const foreign = tmpdir('localrepo-foreign-');
   t.after(() => rm(foreign));
   link(appRoot, 'foreignlink', foreign);
   writeManifest(appRoot, {

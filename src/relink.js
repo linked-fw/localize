@@ -26,7 +26,7 @@ export function relink(deps) {
     manifest = readManifest(deps.appRoot, deps);
   } catch (e) {
     // Even a refusal is only a warning here: never fail an install.
-    deps.warn(`[localpkg] ${e.message}`);
+    deps.warn(`[localrepo] ${e.message}`);
     return 0;
   }
 
@@ -41,8 +41,8 @@ export function relink(deps) {
 
     if (!fs.existsSync(checkout)) {
       deps.warn(
-        `[localpkg] ${name} is recorded as local but ${entry.path} is gone — using the registry ` +
-          `copy. \`localpkg ${name}\` to re-clone.`,
+        `[localrepo] ${name} is recorded as local but ${entry.path} is gone — using the registry ` +
+          `copy. \`localrepo ${name}\` to re-clone.`,
       );
       continue;
     }
@@ -55,14 +55,14 @@ export function relink(deps) {
 
     writeLink(deps.appRoot, name, checkout);
     relinked++;
-    deps.log(`[localpkg] relinked ${name} -> ${entry.path} (branch ${entry.branch})`);
+    deps.log(`[localrepo] relinked ${name} -> ${entry.path} (branch ${entry.branch})`);
     warnRangeDrift(name, entry, checkout, deps);
   }
 
   if (relinked) {
     deps.log(
-      `[localpkg] ${relinked} local package${relinked === 1 ? '' : 's'} relinked. ` +
-        '`localpkg --list` for detail.',
+      `[localrepo] ${relinked} local package${relinked === 1 ? '' : 's'} relinked. ` +
+        '`localrepo --list` for detail.',
     );
   }
   return 0;
@@ -80,7 +80,7 @@ function warnRangeDrift(name, entry, checkout, deps) {
   if (!declared || !version) return;
   if (sameMajor(version, declared) && (!entry.range || entry.range === declared)) return;
   deps.warn(
-    `[localpkg] ${name}: checkout is ${version}, package.json asks ${declared}` +
+    `[localrepo] ${name}: checkout is ${version}, package.json asks ${declared}` +
       (entry.range ? ` (recorded ${entry.range})` : '') +
       ` — the symlink wins; npm does NOT check the range.`,
   );

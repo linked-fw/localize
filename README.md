@@ -1,10 +1,10 @@
-# localpkg
+# localrepo
 
 **Edit one of your npm dependencies as a git checkout, without touching your
 `package.json` or your lockfile.**
 
 ```sh
-npx localpkg some-dependency
+npx localrepo some-dependency
 ```
 
 That clones `some-dependency`'s repository into `packages-local/`, installs its
@@ -13,7 +13,7 @@ dependencies **inside the checkout**, and symlinks
 commit it, push it. When you are done:
 
 ```sh
-npx localpkg remove some-dependency
+npx localrepo remove some-dependency
 ```
 
 No dependencies of its own. No build step. Node 18.17+.
@@ -36,7 +36,7 @@ Every existing way of doing that has a catch:
 | npm/pnpm/yarn workspaces | you have to restructure the repository, and the package becomes part of *your* project |
 | a monorepo tool | you have to adopt a monorepo tool |
 
-`localpkg` does the one thing none of them do: it makes the change **entirely
+`localrepo` does the one thing none of them do: it makes the change **entirely
 outside the files npm reads**. Your `package.json` and `package-lock.json` come
 out byte-for-byte identical — the tool hashes them before and after and refuses
 with a non-zero exit if they moved. CI, which never has the checkout, installs
@@ -55,12 +55,12 @@ npm package name
 
 Four of those five deserve a sentence.
 
-**The repository comes from the registry.** `localpkg` runs
+**The repository comes from the registry.** `localrepo` runs
 `npm view <name> repository`, which is metadata the package already published.
 There is no mapping table to maintain, no GitHub org to configure, and no
 guessing — which also means it works for a private registry, because `npm view`
 uses whatever registry and token you already have configured. If a package
-publishes no `repository`, `localpkg` refuses and tells you to pass `--repo`
+publishes no `repository`, `localrepo` refuses and tells you to pass `--repo`
 once; it never tries to find the source some other way.
 
 **`npm install` runs inside the checkout, and this is not negotiable.** Node
@@ -84,7 +84,7 @@ There is no `if (process.env.CI)` anywhere in this package. CI has no
 ## Install
 
 ```sh
-npm install --save-dev localpkg      # or just use npx
+npm install --save-dev localrepo      # or just use npx
 ```
 
 Add these two to your `.gitignore`:
@@ -99,7 +99,7 @@ And, so an `npm install` or `npm ci` does not quietly undo your links:
 ```json
 {
   "scripts": {
-    "postinstall": "localpkg --relink"
+    "postinstall": "localrepo --relink"
   }
 }
 ```
@@ -112,13 +112,13 @@ links, always exits 0, and prints nothing at all when there is nothing to do.
 ## Commands
 
 ```sh
-localpkg <package…>            clone, install, link
-localpkg --list                what is localized, and whether it really is
-localpkg --list --check        exit 1 if something recorded is not linked
-localpkg --relink              recreate the recorded links (for postinstall)
-localpkg remove <package…>     unlink and forget; keep the checkout
-localpkg remove                undo everything
-localpkg remove <pkg> --purge  also delete the checkout (refuses on unsaved work)
+localrepo <package…>            clone, install, link
+localrepo --list                what is localized, and whether it really is
+localrepo --list --check        exit 1 if something recorded is not linked
+localrepo --relink              recreate the recorded links (for postinstall)
+localrepo remove <package…>     unlink and forget; keep the checkout
+localrepo remove                undo everything
+localrepo remove <pkg> --purge  also delete the checkout (refuses on unsaved work)
 ```
 
 Packages are named exactly as npm names them: `lodash`, `@scope/thing`. There
@@ -135,15 +135,15 @@ are no short names and no aliases.
 ### Packages published from a monorepo
 
 If the package sets `repository.directory` — npm's own field for this —
-`localpkg` uses it: it clones the whole repository, and installs and links the
+`localrepo` uses it: it clones the whole repository, and installs and links the
 package's directory inside it. Nothing to configure.
 
-If it does not, `localpkg` will clone the repository, see that the root is a
+If it does not, `localrepo` will clone the repository, see that the root is a
 different package, and **refuse rather than link the wrong thing**. Tell it
 where to look, once:
 
 ```sh
-localpkg @scope/thing --subdir packages/thing
+localrepo @scope/thing --subdir packages/thing
 ```
 
 Both `--repo` and `--subdir` are written into `local-packages.json`, so you
@@ -151,11 +151,11 @@ pass them the first time and never again.
 
 ### Building the checkout
 
-`localpkg` has no idea how your package is built and does not look for a
+`localrepo` has no idea how your package is built and does not look for a
 builder. If the checkout needs a build step before your app can use it, say so:
 
 ```sh
-localpkg @scope/thing --build "npm run build"
+localrepo @scope/thing --build "npm run build"
 ```
 
 If the build fails, you get a warning and the package is linked anyway — a
@@ -163,7 +163,7 @@ package whose build is broken is usually exactly the thing you are about to
 fix. Many projects need nothing here, because their dev server reads the
 checkout's source directly.
 
-## `localpkg --list`
+## `localrepo --list`
 
 The record of what you *intended* and the symlinks that are actually there can
 disagree. `--list` reads the symlinks first and reports the disagreement:
@@ -178,10 +178,10 @@ stray          linked       ../elsewhere/stray           —          not in loc
 ```
 
 - **`checkout present`** — the checkout is there, the symlink is not. This is
-  what an `npm install`/`npm ci` leaves behind. `localpkg --relink` fixes it.
-- **`CHECKOUT MISSING`** — recorded, but nothing on disk. Run `localpkg <name>`
+  what an `npm install`/`npm ci` leaves behind. `localrepo --relink` fixes it.
+- **`CHECKOUT MISSING`** — recorded, but nothing on disk. Run `localrepo <name>`
   to clone it again.
-- **`not in local-packages.json`** — a symlink `localpkg` did not create. It is
+- **`not in local-packages.json`** — a symlink `localrepo` did not create. It is
   reported and never touched.
 
 `--list` never writes and always exits 0. Add `--check` in a script to get exit
@@ -204,14 +204,14 @@ stray          linked       ../elsewhere/stray           —          not in loc
 ```
 
 Gitignored, written atomically, and **never repaired**: if it is unparseable or
-carries a schema version this build does not know, `localpkg` refuses to read
+carries a schema version this build does not know, `localrepo` refuses to read
 *or* rewrite it and tells you where it is. It is the only record of what you
 intended, and silently resetting it is how a half-localized tree becomes
 invisible.
 
 `range` is informational. **npm matches a linked package by name and never
 checks its version**, so a checkout at `2.0.99` satisfies `^3.0.0` as far as
-your tree is concerned and `npm ls` will not flag it. `localpkg` warns about
+your tree is concerned and `npm ls` will not flag it. `localrepo` warns about
 that drift and never uses it to decide anything.
 
 ## Exit codes
@@ -244,7 +244,7 @@ undo the first.
 ## Programmatic use
 
 ```js
-import {localize, delocalize, list, relink, defaultDeps} from 'localpkg';
+import {localize, delocalize, list, relink, defaultDeps} from 'localrepo';
 
 const deps = defaultDeps(process.cwd());
 const code = localize(['@scope/thing'], {build: 'npm run build'}, deps);

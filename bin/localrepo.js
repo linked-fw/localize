@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * localpkg's command line.
+ * localrepo's command line.
  *
- * Hand-rolled argument parsing rather than a parser dependency: localpkg has
+ * Hand-rolled argument parsing rather than a parser dependency: localrepo has
  * no dependencies at all, which is worth more to a build tool than the few
  * lines this saves. `node:util`'s parseArgs is not used either, because its
  * strict mode rejects the `--` free-form values people type and its error
@@ -17,13 +17,13 @@ import {list} from '../src/list.js';
 import {relink} from '../src/relink.js';
 
 const USAGE = `
-localpkg — develop an npm dependency from a git checkout.
+localrepo — develop an npm dependency from a git checkout.
 
-  localpkg <package…> [options]     clone, install inside the checkout, symlink it in
-  localpkg --list [--check]         report what is localized, and whether it really is
-  localpkg --relink                 recreate the recorded symlinks (use from postinstall)
-  localpkg remove <package…>        undo: unlink and forget, keeping the checkout
-  localpkg remove                   undo every localized package
+  localrepo <package…> [options]     clone, install inside the checkout, symlink it in
+  localrepo --list [--check]         report what is localized, and whether it really is
+  localrepo --relink                 recreate the recorded symlinks (use from postinstall)
+  localrepo remove <package…>        undo: unlink and forget, keeping the checkout
+  localrepo remove                   undo every localized package
 
 Packages are named exactly as npm names them: \`lodash\`, \`@scope/thing\`.
 The repository is read from the package's published \`repository\` field.
@@ -62,7 +62,7 @@ function parse(argv) {
     } else if (FLAGS.has(a)) {
       opts[a.replace(/^-+/, '')] = true;
     } else if (a.startsWith('-')) {
-      fatal(`unknown option ${a}. \`localpkg --help\` for the list.`);
+      fatal(`unknown option ${a}. \`localrepo --help\` for the list.`);
     } else {
       names.push(a);
     }
@@ -71,7 +71,7 @@ function parse(argv) {
 }
 
 function fatal(msg) {
-  console.error(`[localpkg] ${msg}`);
+  console.error(`[localrepo] ${msg}`);
   process.exit(2);
 }
 

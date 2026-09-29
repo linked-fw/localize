@@ -16,12 +16,12 @@ import path from 'node:path';
 
 import {makeRun} from '../src/run.js';
 
-export function tmpdir(prefix = 'localpkg-') {
+export function tmpdir(prefix = 'localrepo-') {
   return fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix)));
 }
 
 export function makeConsumer({pkg} = {}) {
-  const appRoot = tmpdir('localpkg-consumer-');
+  const appRoot = tmpdir('localrepo-consumer-');
   fs.mkdirSync(path.join(appRoot, 'node_modules'), {recursive: true});
   fs.writeFileSync(
     path.join(appRoot, 'package.json'),

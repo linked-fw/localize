@@ -1,5 +1,5 @@
 /**
- * localpkg's programmatic API.
+ * localrepo's programmatic API.
  *
  * Every function takes `deps` -- `{appRoot, run, log, warn, error}` -- so a
  * caller can point it at another root or capture its output. `defaultDeps()`

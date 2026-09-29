@@ -11,13 +11,13 @@
  * wrong here costs a clone and a full install of the wrong repository.
  *
  * A consumer that wants to accept short names, or to search several GitHub
- * orgs, resolves that to a full package name ITSELF and then calls localpkg.
- * That behaviour is specific to whoever has it, and localpkg deliberately
+ * orgs, resolves that to a full package name ITSELF and then calls localrepo.
+ * That behaviour is specific to whoever has it, and localrepo deliberately
  * offers no seam for it.
  *
  * Metadata is read with `npm view`, not with an HTTP request to
  * registry.npmjs.org, so a private registry, a scoped registry, a proxy and an
- * auth token all work without localpkg knowing any of them exist.
+ * auth token all work without localrepo knowing any of them exist.
  */
 import path from 'node:path';
 
@@ -68,9 +68,9 @@ function fetchMetadata(name, deps) {
   if (r.status !== 0) {
     throw new LocalpkgError(
       `cannot read registry metadata for "${name}":\n${(r.stderr || r.stdout).trim()}\n` +
-        `localpkg resolves a repository only from the published package. If the package is not ` +
+        `localrepo resolves a repository only from the published package. If the package is not ` +
         `published, or you are not authenticated for its registry, pass the repository ` +
-        `explicitly:  localpkg ${name} --repo <git-url>`,
+        `explicitly:  localrepo ${name} --repo <git-url>`,
       EXIT_NOT_FOUND,
     );
   }
@@ -108,8 +108,8 @@ function readRepositoryField(meta, name) {
   const missing = () =>
     new LocalpkgError(
       `"${name}" publishes no usable "repository" field, so there is nothing to clone.\n` +
-        `localpkg never guesses at a repository URL. Pass it once:\n` +
-        `  localpkg ${name} --repo <git-url> [--subdir <path-inside-the-repo>]\n` +
+        `localrepo never guesses at a repository URL. Pass it once:\n` +
+        `  localrepo ${name} --repo <git-url> [--subdir <path-inside-the-repo>]\n` +
         `It is recorded in local-packages.json, so you only pass it the first time.`,
       EXIT_NOT_FOUND,
     );

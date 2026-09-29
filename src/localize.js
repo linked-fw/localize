@@ -113,7 +113,7 @@ function localizeOne(name, dir, recorded, opts, deps) {
     if (code === EXIT_WARNED) return {code}; // a non-fast-forward is reported, never forced
   } else {
     fs.mkdirSync(path.dirname(clone), {recursive: true});
-    deps.log(`[localpkg] cloning ${resolved.repo} -> ${relClone}`);
+    deps.log(`[localrepo] cloning ${resolved.repo} -> ${relClone}`);
     const r = deps.run('git', ['clone', resolved.repo, clone]);
     if (r.status !== 0) {
       throw new LocalpkgError(
@@ -129,7 +129,7 @@ function localizeOne(name, dir, recorded, opts, deps) {
         (resolved.subdir
           ? `The registry says "${name}" lives in "${resolved.subdir}" of ${resolved.repo}, and it does not.`
           : `${resolved.repo} looks like a monorepo root. Say where the package lives:\n` +
-            `  localpkg ${name} --repo ${resolved.repo} --subdir <path-inside-the-repo>`),
+            `  localrepo ${name} --repo ${resolved.repo} --subdir <path-inside-the-repo>`),
       EXIT_REFUSED,
     );
   }
@@ -143,13 +143,13 @@ function localizeOne(name, dir, recorded, opts, deps) {
         (resolved.subdir
           ? `The registry's repository.directory for "${name}" points at the wrong package.`
           : `${resolved.repo} is probably a monorepo. Point at the right directory:\n` +
-            `  localpkg ${name} --repo ${resolved.repo} --subdir <path-inside-the-repo>`),
+            `  localrepo ${name} --repo ${resolved.repo} --subdir <path-inside-the-repo>`),
       EXIT_REFUSED,
     );
   }
 
   // THE constraint. Read the module header before changing this.
-  deps.log(`[localpkg] npm install in ${relPkg}`);
+  deps.log(`[localrepo] npm install in ${relPkg}`);
   const install = deps.run('npm', ['install', '--no-audit', '--no-fund'], {cwd: pkgDir});
   if (install.status !== 0) {
     throw new LocalpkgError(
@@ -159,7 +159,7 @@ function localizeOne(name, dir, recorded, opts, deps) {
     );
   }
 
-  // The build is the one thing localpkg does not know how to do, so it is
+  // The build is the one thing localrepo does not know how to do, so it is
   // configuration rather than behaviour. A failure is a WARNING: a package
   // whose build is broken is exactly what you are about to fix, and refusing
   // to link it would be perverse.
@@ -167,7 +167,7 @@ function localizeOne(name, dir, recorded, opts, deps) {
 
   writeLink(deps.appRoot, resolved.npmName, pkgDir);
   const branch = currentBranch(clone, deps);
-  deps.log(`[localpkg] linked ${resolved.npmName} -> ${relPkg} (branch ${branch})`);
+  deps.log(`[localrepo] linked ${resolved.npmName} -> ${relPkg} (branch ${branch})`);
 
   const range = declaredRange(resolved.npmName, deps);
   return {
@@ -199,13 +199,13 @@ function refresh(relPath, clone, deps) {
   const status = deps.run('git', ['status', '--porcelain'], {cwd: clone});
   const modified = status.stdout.split('\n').filter((l) => l.trim()).length;
   if (modified > 0) {
-    deps.log(`[localpkg] ${relPath}: ${modified} modified file${modified === 1 ? '' : 's'} — not pulling`);
+    deps.log(`[localrepo] ${relPath}: ${modified} modified file${modified === 1 ? '' : 's'} — not pulling`);
     return 0;
   }
   const pull = deps.run('git', ['pull', '--ff-only'], {cwd: clone});
   if (pull.status !== 0) {
     deps.warn(
-      `[localpkg] ${relPath}: \`git pull --ff-only\` failed (not a fast-forward) — skipped, not ` +
+      `[localrepo] ${relPath}: \`git pull --ff-only\` failed (not a fast-forward) — skipped, not ` +
         `forced. Reconcile it by hand:\n${(pull.stderr || pull.stdout).trim()}`,
     );
     return EXIT_WARNED;
@@ -216,7 +216,7 @@ function refresh(relPath, clone, deps) {
 /**
  * Run the configured build command, if there is one.
  *
- * localpkg has no opinion about how a checkout is built, and does not look for
+ * localrepo has no opinion about how a checkout is built, and does not look for
  * a builder. `--build "<cmd>"`, or a `build` field in the manifest, or
  * `{build}` in the programmatic options. Absent -- the common case, and the
  * case for anything whose dev loop reads source directly -- nothing runs and
@@ -225,11 +225,11 @@ function refresh(relPath, clone, deps) {
 function runBuild(relPath, pkgDir, opts, deps) {
   const cmd = opts.build;
   if (!cmd) return 'skipped';
-  deps.log(`[localpkg] ${relPath}: ${cmd}`);
+  deps.log(`[localrepo] ${relPath}: ${cmd}`);
   const r = deps.run(cmd, [], {cwd: pkgDir, shell: true});
   if (r.status !== 0) {
     deps.warn(
-      `[localpkg] ${relPath}: \`${cmd}\` failed. The package is linked and recorded anyway — ` +
+      `[localrepo] ${relPath}: \`${cmd}\` failed. The package is linked and recorded anyway — ` +
         `a package whose build is broken is exactly what you are about to fix.\n` +
         `${(r.stderr || r.stdout).trim()}`,
     );
@@ -250,7 +250,7 @@ function guardForeignLink(npmName, dir, opts, deps) {
   }
   if (isInside(target, path.join(deps.appRoot, dir))) return;
   if (opts.force) {
-    deps.warn(`[localpkg] --force: overwriting the existing link ${npmName} -> ${target}`);
+    deps.warn(`[localrepo] --force: overwriting the existing link ${npmName} -> ${target}`);
     return;
   }
   throw new LocalpkgError(
@@ -267,14 +267,14 @@ function assertLinked(entries, deps) {
     const link = path.join(deps.appRoot, 'node_modules', name);
     const expected = path.join(deps.appRoot, entry.path);
     if (!isSymlink(link)) {
-      deps.warn(`[localpkg] ${name} is recorded but node_modules/${name} is not a symlink.`);
+      deps.warn(`[localrepo] ${name} is recorded but node_modules/${name} is not a symlink.`);
       code = Math.max(code, EXIT_WARNED);
       continue;
     }
     if (!fs.existsSync(expected)) continue; // "checkout missing" is a --list state, not a failure
     if (fs.realpathSync(link) !== fs.realpathSync(expected)) {
       deps.warn(
-        `[localpkg] ${name} links to ${fs.realpathSync(link)} but the manifest records ${entry.path}.`,
+        `[localrepo] ${name} links to ${fs.realpathSync(link)} but the manifest records ${entry.path}.`,
       );
       code = Math.max(code, EXIT_WARNED);
     }
@@ -294,17 +294,17 @@ export function assertManifestsUntouched(before, deps) {
   const changed = diffManifests(before, snapshotManifests(deps.appRoot));
   if (!changed.length) return 0;
   deps.error(
-    `[localpkg] the consumer's manifests changed while this command ran:\n` +
+    `[localrepo] the consumer's manifests changed while this command ran:\n` +
       changed.map((c) => `  ${c}`).join('\n') +
-      `\nThis is the exact failure localpkg exists to prevent. Revert those files; nothing in ` +
-      `localpkg is supposed to touch them.`,
+      `\nThis is the exact failure localrepo exists to prevent. Revert those files; nothing in ` +
+      `localrepo is supposed to touch them.`,
   );
   return EXIT_MANIFEST_DIRTY;
 }
 
 export function reportError(e, deps) {
   if (e instanceof LocalpkgError) {
-    deps.error(`[localpkg] ${e.message}`);
+    deps.error(`[localrepo] ${e.message}`);
     return e.code;
   }
   throw e;
