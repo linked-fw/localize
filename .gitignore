@@ -1,0 +1,5 @@
+node_modules/
+packages-local/
+local-packages.json
+*.tgz
+.DS_Store
