@@ -4,7 +4,7 @@
 `package.json` or your lockfile.**
 
 The binary is `linked-localize`. Framework users reach the same command as
-`linked localize`, through [`@_linked/cli`](https://github.com/linked-fw/cli).
+`linked localize`, through [@_linked/cli](https://github.com/linked-fw/cli).
 
 ```sh
 npx linked-localize some-dependency
@@ -55,8 +55,6 @@ npm package name
   → fs.symlink node_modules/<name> → checkout  (not npm link)
   → record it in local-packages.json           (gitignored)
 ```
-
-Four of those five deserve a sentence.
 
 **The repository comes from the registry.** `localize` runs
 `npm view <name> repository`, which is metadata the package already published.
