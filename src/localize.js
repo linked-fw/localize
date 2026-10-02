@@ -360,7 +360,15 @@ export function reportError(e, deps) {
   throw e;
 }
 
+/**
+ * The checked-out branch, or `HEAD` when detached. `symbolic-ref` first,
+ * because it also names the branch of a repository with no commits yet --
+ * `rev-parse --abbrev-ref` fails there, and `create-package` adopts a fresh
+ * `git init` before its first commit.
+ */
 export function currentBranch(clone, deps) {
+  const sym = deps.run('git', ['symbolic-ref', '--short', '-q', 'HEAD'], {cwd: clone});
+  if (sym.status === 0 && sym.stdout.trim()) return sym.stdout.trim();
   const r = deps.run('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {cwd: clone});
   const b = r.stdout.trim();
   return r.status === 0 && b ? b : 'HEAD';

@@ -13,6 +13,9 @@ import {localize} from '../src/localize.js';
 import {relink} from '../src/relink.js';
 import {list} from '../src/list.js';
 import {readManifest} from '../src/manifest.js';
+import {spawnSync} from 'node:child_process';
+
+import {makeRun} from '../src/run.js';
 import {fail, makeConsumer, ok, rm, stubbed} from './helpers.js';
 
 const consumer = (t, pkg) => {
@@ -138,4 +141,19 @@ test('localize on an unpublished package whose checkout is already there points 
 
   assert.equal(localize(['@scope/unpublished'], {}, deps), 4);
   assert.match(deps.output(), /linked-localize adopt @scope\/unpublished/);
+});
+
+test('a fresh `git init` with no commit yet is recorded on its branch, not as HEAD', (t) => {
+  const appRoot = consumer(t);
+  const checkout = seed(appRoot, 'unborn', {name: 'unborn', version: '1.0.0'}, {git: false});
+  const init = spawnSync('git', ['init', '--quiet', '-b', 'trunk'], {cwd: checkout});
+  assert.equal(init.status, 0, String(init.stderr));
+
+  // Real git -- the point is what git itself answers on an unborn branch --
+  // but no real npm.
+  const realGit = makeRun(appRoot);
+  const deps = stubbed(appRoot, (inv) => (inv.cmd === 'git' ? realGit(inv.cmd, inv.args, {cwd: inv.cwd}) : ok()));
+
+  assert.equal(adopt(['unborn'], {}, deps), 0, deps.output());
+  assert.equal(readManifest(appRoot, deps).entries.unborn.branch, 'trunk');
 });
