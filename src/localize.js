@@ -9,6 +9,10 @@
  *   4. `fs.symlink` node_modules/<name> -> the checkout
  *   5. record it in a gitignored manifest
  *
+ * `adopt` (adopt.js) enters at step 3 with a checkout that is already there,
+ * and shares everything from there on: `forEachName` and `installLinkAndRecord`
+ * below.
+ *
  * Step 3 is the one that is easy to "simplify" and must not be. Installing
  * from the parent instead -- `npm install <path> --no-save` -- hard-failed an
  * app's boot on a missing peer dependency, because module resolution happens

@@ -4,6 +4,7 @@
  * never clones, pulls or fetches.
  */
 import {test} from 'node:test';
+import {spawnSync} from 'node:child_process';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -13,8 +14,6 @@ import {localize} from '../src/localize.js';
 import {relink} from '../src/relink.js';
 import {list} from '../src/list.js';
 import {readManifest} from '../src/manifest.js';
-import {spawnSync} from 'node:child_process';
-
 import {makeRun} from '../src/run.js';
 import {fail, makeConsumer, ok, rm, stubbed} from './helpers.js';
 
@@ -35,7 +34,7 @@ function seed(appRoot, dirName, pkgJson, {git = true} = {}) {
 
 /** git answers: a branch, and an origin only when one is given. */
 const gitWith = (origin) => (inv) => {
-  if (inv.args[0] === 'rev-parse') return ok('main\n');
+  if (inv.args[0] === 'symbolic-ref') return ok('main\n');
   if (inv.args[0] === 'remote') return origin ? ok(origin + '\n') : fail("error: No such remote 'origin'", 2);
   return ok();
 };

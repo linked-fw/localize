@@ -2,11 +2,13 @@
  * `local-packages.json` -- the record of which packages are currently localized.
  *
  * The filename and schema are deliberately the SAME as the ones `@semantu/cli`
- * already writes (schema version 1, keys are npm package names). One relaxation
- * since: `repo` is optional, because an adopted checkout may have no remote. An
- * older reader skips such an entry as partial, with a warning, and keeps the rest. A developer
+ * already writes (schema version 1, keys are npm package names). A developer
  * with a half-localized tree must be able to switch tools without re-cloning,
  * and the consumer's `postinstall` must keep working across the switch.
+ *
+ * One relaxation since 0.1.0: `repo` is optional, because an adopted checkout
+ * may have no remote. localize 0.1.0 skips such an entry as partial, with a
+ * warning, and keeps the rest; other readers of this schema were not checked.
  *
  * Two properties are load-bearing:
  *

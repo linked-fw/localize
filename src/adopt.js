@@ -16,7 +16,8 @@
  * that `localize` and `adopt` can never disagree about where a package lives.
  *
  * The recorded `repo` is `--repo` when given, else the checkout's `origin`,
- * else absent. Absent is fine: `relink`, `--list` and `remove` never need it.
+ * else what an earlier run recorded, else absent. Absent is fine: `relink`,
+ * `--list` and `remove` never need it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -72,6 +73,13 @@ function adoptOne(name, dir, recorded, opts, deps) {
         ? `${relPkg} declares itself as "${declared}", not "${name}".`
         : `${relPkg} has no package.json naming it, so it is not the package "${name}".`,
       EXIT_REFUSED,
+    );
+  }
+
+  if (recorded?.subdir) {
+    deps.warn(
+      `[localize] ${name} was recorded inside a monorepo (${recorded.path}); adopt replaces that ` +
+        `with ${relPkg}.`,
     );
   }
 

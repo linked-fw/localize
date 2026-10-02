@@ -293,3 +293,31 @@ test('relink warns and skips a missing checkout rather than erroring', (t) => {
   assert.match(deps.output(), /is recorded as local but packages-local\/widget is gone/);
   assert.equal(fs.existsSync(path.join(appRoot, 'node_modules', 'widget')), false);
 });
+
+test('relink finds a monorepo package\'s dependencies where the workspace hoisted them', (t) => {
+  const appRoot = consumer(t);
+  const clone = path.join(appRoot, 'packages-local', 'mono');
+  const pkgDir = path.join(clone, 'packages', 'a');
+  fs.mkdirSync(path.join(clone, 'node_modules', 'hoisted'), {recursive: true});
+  fs.mkdirSync(pkgDir, {recursive: true});
+  fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify({name: 'a', version: '1.0.0', dependencies: {hoisted: '1'}}));
+  writeManifest(appRoot, {
+    dir: 'packages-local',
+    packages: {a: {repo: 'r', path: 'packages-local/mono/packages/a', branch: 'main', subdir: 'packages/a'}},
+  });
+
+  const deps = stubbed(appRoot);
+  assert.equal(relink(deps), 0);
+  assert.equal(deps.npmCalls().length, 0, deps.output());
+});
+
+test('delocalize of a never-published package does not print a restore that would 404', (t) => {
+  const appRoot = consumer(t);
+  seedCheckout(appRoot, 'fresh');
+  writeManifest(appRoot, {dir: 'packages-local', packages: {fresh: {path: 'packages-local/fresh', branch: 'main'}}});
+
+  const deps = stubbed(appRoot);
+  assert.equal(delocalize(['fresh'], {}, deps), 0, deps.output());
+  assert.doesNotMatch(deps.output(), /npm install --no-save fresh@latest/);
+  assert.match(deps.output(), /no registry copy to restore/);
+});

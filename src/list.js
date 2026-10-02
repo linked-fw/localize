@@ -30,7 +30,8 @@ export function collect(deps) {
     if (target && isInside(target, dir)) {
       rows.push({name, state: 'linked', path: entry.path, branch: entry.branch, note: ''});
     } else if (!fs.existsSync(checkout)) {
-      // Recorded, but nothing on disk. `localize <name>` re-clones.
+      // Recorded, but nothing on disk. `localize <name>` re-clones it when the
+      // entry has a repo or the package is published; otherwise it is restored by hand.
       rows.push({name, state: 'checkout-missing', path: entry.path, branch: '—', note: 'CHECKOUT MISSING'});
     } else {
       // Intent and checkout present, symlink gone. This is what `npm ci`
