@@ -13,7 +13,7 @@ import {delocalize} from '../src/delocalize.js';
 import {list} from '../src/list.js';
 import {relink} from '../src/relink.js';
 import {writeManifest, readManifest} from '../src/manifest.js';
-import {makeConsumer, ok, rm, stubbed, tmpdir} from './helpers.js';
+import {fail, makeConsumer, ok, rm, stubbed, tmpdir} from './helpers.js';
 
 const consumer = (t, pkg) => {
   const root = makeConsumer({pkg});
@@ -229,20 +229,45 @@ test('--purge refuses on uncommitted work unless forced', (t) => {
 
 // --- relink (the postinstall hook) -----------------------------------------
 
-test('relink never invokes npm, on any path', (t) => {
+test('relink never runs npm when the checkout is intact', (t) => {
   const appRoot = consumer(t, {dependencies: {widget: '^3.0.0'}});
   const checkout = seedCheckout(appRoot, 'widget', {version: '2.0.99'});
   writeManifest(appRoot, {dir: 'packages-local', packages: {widget: {repo: 'r', path: 'packages-local/widget', branch: 'main'}}});
 
   const deps = stubbed(appRoot);
   assert.equal(relink(deps), 0);
-  assert.equal(deps.npmCalls().length, 0, 'a postinstall that installs, recurses');
+  assert.equal(deps.npmCalls().length, 0, 'an ordinary install stays silent and fast');
   assert.ok(fs.lstatSync(path.join(appRoot, 'node_modules', 'widget')).isSymbolicLink());
 
   // npm matches a link by NAME and never checks the range: 2.0.99 satisfies
   // ^3.0.0 as far as npm is concerned. Warn, never fail.
   assert.match(deps.output(), /checkout is 2\.0\.99, package\.json asks \^3\.0\.0/);
   assert.match(deps.output(), /the symlink wins; npm does NOT check the range/);
+});
+
+test('relink reinstalls a checkout a root install pruned — inside the checkout, never at the root', (t) => {
+  const appRoot = consumer(t);
+  const checkout = path.join(appRoot, 'packages-local', 'widget');
+  fs.mkdirSync(path.join(checkout, '.git'), {recursive: true});
+  fs.writeFileSync(
+    path.join(checkout, 'package.json'),
+    JSON.stringify({name: 'widget', version: '1.0.0', dependencies: {kept: '1'}, devDependencies: {pruned: '1'}}),
+  );
+  fs.mkdirSync(path.join(checkout, 'node_modules', 'kept'), {recursive: true});
+  writeManifest(appRoot, {dir: 'packages-local', packages: {widget: {path: 'packages-local/widget', branch: 'main'}}});
+
+  const deps = stubbed(appRoot);
+  assert.equal(relink(deps), 0);
+  const installs = deps.npmCalls();
+  assert.equal(installs.length, 1, deps.output());
+  assert.equal(installs[0].cwd, checkout);
+  assert.notEqual(installs[0].cwd, appRoot, 'a postinstall that installs the root, recurses');
+  assert.match(deps.output(), /1 of its dependencies are gone/);
+
+  // A failed reinstall warns; the hook never fails an install.
+  const failing = stubbed(appRoot, () => fail('ENETUNREACH'));
+  assert.equal(relink(failing), 0);
+  assert.match(failing.output(), /npm install in packages-local\/widget failed/);
 });
 
 test('relink with no manifest produces no output at all — the CI case', (t) => {

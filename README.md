@@ -112,6 +112,15 @@ leaving you running the registry copy while you edit the checkout. That is the
 state that costs hours, because nothing reports it. `--relink` restores the
 links, always exits 0, and prints nothing at all when there is nothing to do.
 
+A plain `npm install` does something worse to a checkout that sits inside your
+project, as `packages-local/` does: npm counts the linked checkout as part of
+your tree, marks its dependencies `extraneous` and **deletes them** — a
+localized published dependency as much as an unpublished one (measured on
+npm 11). So `--relink` also checks each checkout's declared dependencies and,
+when any are gone, runs `npm install` **inside that checkout** — never in your
+project, so it cannot re-enter the hook. The cost is that install, once per
+pruned checkout, after every root `npm install`.
+
 ## Commands
 
 ```sh
