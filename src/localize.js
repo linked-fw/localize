@@ -9,6 +9,10 @@
  *   4. `fs.symlink` node_modules/<name> -> the checkout
  *   5. record it in a gitignored manifest
  *
+ * `adopt` (adopt.js) enters at step 3 with a checkout that is already there,
+ * and shares everything from there on: `forEachName` and `installLinkAndRecord`
+ * below.
+ *
  * Step 3 is the one that is easy to "simplify" and must not be. Installing
  * from the parent instead -- `npm install <path> --no-save` -- hard-failed an
  * app's boot on a missing peer dependency, because module resolution happens
@@ -29,13 +33,14 @@ import path from 'node:path';
 
 import {
   EXIT_INSTALL_FAILED,
+  EXIT_NOT_FOUND,
   EXIT_MANIFEST_DIRTY,
   EXIT_REFUSED,
   EXIT_WARNED,
   LocalizeError,
 } from './errors.js';
 import {DEFAULT_DIR, SCHEMA_VERSION, readManifest, writeManifest} from './manifest.js';
-import {resolvePackage} from './resolve.js';
+import {checkoutNameFor, resolvePackage} from './resolve.js';
 import {
   diffManifests,
   isGitCheckout,
@@ -54,6 +59,18 @@ import {
  *   since each name is atomic and a failure on name 2 does not undo name 1.
  */
 export function localize(names, opts, deps) {
+  return forEachName(names, opts, deps, localizeOne);
+}
+
+/**
+ * The loop `localize` and `adopt` share: read the manifest once, run `one` per
+ * name, write the manifest after each, then assert the links and the
+ * consumer's untouched manifests.
+ *
+ * @param {(name: string, dir: string, recorded: object|undefined, opts: object, deps: object)
+ *   => {code: number, entry?: {name: string, value: object}}} one
+ */
+export function forEachName(names, opts, deps, one) {
   // Taken BEFORE anything runs: the post-condition is about what THIS run
   // changed, not about what the tree looked like at HEAD.
   const before = snapshotManifests(deps.appRoot);
@@ -71,7 +88,7 @@ export function localize(names, opts, deps) {
 
   for (const name of names) {
     try {
-      const result = localizeOne(name, dir, entries[name], opts, deps);
+      const result = one(name, dir, entries[name], opts, deps);
       if (result.entry) entries[result.entry.name] = result.entry.value;
       code = Math.max(code, result.code);
       // Written after EACH name, so an interruption keeps what already worked.
@@ -95,7 +112,7 @@ function localizeOne(name, dir, recorded, opts, deps) {
       ? {repo: recorded.repo, subdir: recorded.subdir}
       : undefined;
 
-  const resolved = resolvePackage(name, deps, override);
+  const resolved = resolveOrSuggestAdopt(name, dir, override, deps);
   let code = 0;
 
   const relClone = path.join(dir, resolved.checkoutName);
@@ -148,6 +165,23 @@ function localizeOne(name, dir, recorded, opts, deps) {
     );
   }
 
+  return installLinkAndRecord(
+    {npmName: resolved.npmName, clone, relPkg, pkgDir, repo: resolved.repo, subdir: resolved.subdir},
+    opts,
+    deps,
+    code,
+  );
+}
+
+/**
+ * Everything after the checkout exists, shared by `localize` and `adopt`:
+ * install inside it, run the configured build, link it, and describe the
+ * manifest entry. Nothing here knows how the checkout got there.
+ *
+ * `repo` may be absent -- an adopted checkout with no remote is recorded
+ * without one.
+ */
+export function installLinkAndRecord({npmName, clone, relPkg, pkgDir, repo, subdir}, opts, deps, code = 0) {
   // THE constraint. Read the module header before changing this.
   deps.log(`[localize] npm install in ${relPkg}`);
   const install = deps.run('npm', ['install', '--no-audit', '--no-fund'], {cwd: pkgDir});
@@ -165,24 +199,44 @@ function localizeOne(name, dir, recorded, opts, deps) {
   // to link it would be perverse.
   if (runBuild(relPkg, pkgDir, opts, deps) === 'failed') code = Math.max(code, EXIT_WARNED);
 
-  writeLink(deps.appRoot, resolved.npmName, pkgDir);
+  writeLink(deps.appRoot, npmName, pkgDir);
   const branch = currentBranch(clone, deps);
-  deps.log(`[localize] linked ${resolved.npmName} -> ${relPkg} (branch ${branch})`);
+  deps.log(`[localize] linked ${npmName} -> ${relPkg} (branch ${branch})`);
 
-  const range = declaredRange(resolved.npmName, deps);
+  const range = declaredRange(npmName, deps);
   return {
     code,
     entry: {
-      name: resolved.npmName,
+      name: npmName,
       value: {
-        repo: resolved.repo,
+        ...(repo ? {repo} : {}),
         path: relPkg,
         branch,
-        ...(resolved.subdir ? {subdir: resolved.subdir} : {}),
+        ...(subdir ? {subdir} : {}),
         ...(range ? {range} : {}),
       },
     },
   };
+}
+
+/**
+ * A registry lookup that fails while a git checkout already sits where the
+ * clone would go is almost always a package that was never published -- one
+ * made locally. Say how to link it as it is rather than leave the developer
+ * guessing at a `--repo`.
+ */
+function resolveOrSuggestAdopt(name, dir, override, deps) {
+  try {
+    return resolvePackage(name, deps, override);
+  } catch (e) {
+    const relClone = path.join(dir, checkoutNameFor(name));
+    if (e instanceof LocalizeError && e.code === EXIT_NOT_FOUND && isGitCheckout(path.join(deps.appRoot, relClone))) {
+      e.message +=
+        `\n${relClone} is already a git checkout. To link it as it is, with no registry lookup:\n` +
+        `  linked-localize adopt ${name}`;
+    }
+    throw e;
+  }
 }
 
 /** Older manifests recorded `owner/repo`; those are re-resolved rather than cloned blind. */
@@ -239,7 +293,7 @@ function runBuild(relPath, pkgDir, opts, deps) {
 }
 
 /** Refuse when `node_modules/<name>` is already a symlink pointing outside `<dir>`. */
-function guardForeignLink(npmName, dir, opts, deps) {
+export function guardForeignLink(npmName, dir, opts, deps) {
   const link = path.join(deps.appRoot, 'node_modules', npmName);
   if (!isSymlink(link)) return;
   let target;
@@ -310,7 +364,15 @@ export function reportError(e, deps) {
   throw e;
 }
 
+/**
+ * The checked-out branch, or `HEAD` when detached. `symbolic-ref` first,
+ * because it also names the branch of a repository with no commits yet --
+ * `rev-parse --abbrev-ref` fails there, and `create-package` adopts a fresh
+ * `git init` before its first commit.
+ */
 export function currentBranch(clone, deps) {
+  const sym = deps.run('git', ['symbolic-ref', '--short', '-q', 'HEAD'], {cwd: clone});
+  if (sym.status === 0 && sym.stdout.trim()) return sym.stdout.trim();
   const r = deps.run('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {cwd: clone});
   const b = r.stdout.trim();
   return r.status === 0 && b ? b : 'HEAD';

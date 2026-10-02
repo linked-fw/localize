@@ -87,3 +87,19 @@ test('the manifest is written where a consumer gitignores it', (t) => {
   const root = consumer(t);
   assert.equal(manifestPath(root), path.join(root, 'local-packages.json'));
 });
+
+test('an entry without a repo is valid -- an adopted checkout may have no remote', (t) => {
+  const root = consumer(t);
+  write(root, JSON.stringify({version: 1, packages: {local: {path: 'packages-local/local', branch: 'main'}}}));
+  const warns = [];
+  const r = readManifest(root, {warn: (m) => warns.push(m)});
+  assert.deepEqual(r.entries, {local: {path: 'packages-local/local', branch: 'main'}});
+  assert.equal(warns.length, 0);
+});
+
+test('a recorded subdir survives a read, so a re-localize does not forget it', (t) => {
+  const root = consumer(t);
+  const entry = {repo: 'https://x/mono.git', path: 'packages-local/mono/pkgs/a', branch: 'main', subdir: 'pkgs/a'};
+  write(root, JSON.stringify({version: 1, packages: {a: entry}}));
+  assert.deepEqual(readManifest(root).entries.a, entry);
+});

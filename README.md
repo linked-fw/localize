@@ -112,10 +112,20 @@ leaving you running the registry copy while you edit the checkout. That is the
 state that costs hours, because nothing reports it. `--relink` restores the
 links, always exits 0, and prints nothing at all when there is nothing to do.
 
+A plain `npm install` does something worse to a checkout that sits inside your
+project, as `packages-local/` does: npm counts the linked checkout as part of
+your tree, marks its dependencies `extraneous` and **deletes them** — a
+localized published dependency as much as an unpublished one (measured on
+npm 11). So `--relink` also checks each checkout's declared dependencies and,
+when any are gone, runs `npm install` **inside that checkout** — never in your
+project, so it cannot re-enter the hook. The cost is that install, once per
+pruned checkout, after every root `npm install`.
+
 ## Commands
 
 ```sh
 linked-localize <package…>            clone, install, link
+linked-localize adopt <package…>      install and link a checkout already in --dir
 linked-localize --list                what is localized, and whether it really is
 linked-localize --list --check        exit 1 if something recorded is not linked
 linked-localize --relink              recreate the recorded links (for postinstall)
@@ -130,7 +140,7 @@ are no short names and no aliases.
 | option | |
 |---|---|
 | `--dir <path>` | where checkouts live. Default `packages-local` |
-| `--repo <git-url>` | clone this instead of the published `repository`, and remember it |
+| `--repo <git-url>` | clone this instead of the published `repository`, and remember it. With `adopt`: record this instead of the checkout's `origin` |
 | `--subdir <path>` | where the package lives inside the repository (monorepos) |
 | `--build "<cmd>"` | run this in the checkout after installing. A failure only warns |
 | `--force` | replace a symlink pointing outside `--dir`; with `--purge`, delete anyway |
@@ -151,6 +161,27 @@ linked-localize @scope/thing --subdir packages/thing
 
 Both `--repo` and `--subdir` are written into `local-packages.json`, so you
 pass them the first time and never again.
+
+### A checkout that is already there: `adopt`
+
+`localize` gets its checkout from the registry. Some checkouts cannot come from
+there: a package you just created and have not published, perhaps with no
+remote yet, or a clone you put in `packages-local/` by hand. `adopt` takes the
+checkout as it is:
+
+```sh
+linked-localize adopt @scope/thing
+```
+
+It expects a git checkout at `packages-local/scope-thing` (the same name
+`localize` would clone to) whose `package.json` is named `@scope/thing`, and
+then does what `localize` does from the install onward: install inside it,
+build, link, record. **It never clones, pulls or fetches.** The recorded `repo`
+is the checkout's `origin`, or `--repo`, or nothing at all — a package with no
+remote relinks and lists like any other.
+
+`localize` itself suggests `adopt` when a registry lookup fails and a checkout
+is already sitting where the clone would go.
 
 ### Building the checkout
 
@@ -212,6 +243,9 @@ carries a schema version this build does not know, `localize` refuses to read
 intended, and silently resetting it is how a half-localized tree becomes
 invisible.
 
+`repo` is absent for a package adopted with no remote; `subdir` is present for
+a package that lives inside a monorepo.
+
 `range` is informational. **npm matches a linked package by name and never
 checks its version**, so a checkout at `2.0.99` satisfies `^3.0.0` as far as
 your tree is concerned and `npm ls` will not flag it. `localize` warns about
@@ -247,7 +281,7 @@ undo the first.
 ## Programmatic use
 
 ```js
-import {localize, delocalize, list, relink, defaultDeps} from '@_linked/localize';
+import {localize, adopt, delocalize, list, relink, defaultDeps} from '@_linked/localize';
 
 const deps = defaultDeps(process.cwd());
 const code = localize(['@scope/thing'], {build: 'npm run build'}, deps);

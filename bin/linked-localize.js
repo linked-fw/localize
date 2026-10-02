@@ -12,6 +12,7 @@ import process from 'node:process';
 
 import {defaultDeps} from '../src/run.js';
 import {localize} from '../src/localize.js';
+import {adopt} from '../src/adopt.js';
 import {delocalize} from '../src/delocalize.js';
 import {list} from '../src/list.js';
 import {relink} from '../src/relink.js';
@@ -20,6 +21,7 @@ const USAGE = `
 localize — develop an npm dependency from a git checkout.
 
   linked-localize <package…> [options]     clone, install inside the checkout, symlink it in
+  linked-localize adopt <package…>         link a checkout already in --dir: no clone, no pull
   linked-localize --list [--check]         report what is localized, and whether it really is
   linked-localize --relink                 recreate the recorded symlinks (use from postinstall)
   linked-localize remove <package…>        undo: unlink and forget, keeping the checkout
@@ -31,6 +33,7 @@ The repository is read from the package's published \`repository\` field.
 Options
   --dir <path>       where checkouts live (default: packages-local)
   --repo <git-url>   clone this instead of the published repository, and record it
+                     (with adopt: record this instead of the checkout's origin)
   --subdir <path>    the package's directory inside the repository (monorepos)
   --build "<cmd>"    run this in the checkout after installing; a failure only warns
   --force            overwrite a symlink pointing outside --dir; with --purge, delete anyway
@@ -97,6 +100,13 @@ if (opts.relink) {
   process.exitCode = relink(deps);
 } else if (names[0] === 'remove' || names[0] === 'delocalize') {
   process.exitCode = delocalize(names.slice(1), {purge: opts.purge, force: opts.force}, deps);
+} else if (names[0] === 'adopt') {
+  if (names.length === 1) fatal('adopt needs at least one package name.');
+  process.exitCode = adopt(
+    names.slice(1),
+    {force: opts.force, dir: opts.dir, repo: opts.repo, build: opts.build},
+    deps,
+  );
 } else if (opts.list || names.length === 0) {
   process.exitCode = list({check: opts.check}, deps);
 } else {

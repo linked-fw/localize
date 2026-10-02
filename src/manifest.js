@@ -6,6 +6,10 @@
  * with a half-localized tree must be able to switch tools without re-cloning,
  * and the consumer's `postinstall` must keep working across the switch.
  *
+ * One relaxation since 0.1.0: `repo` is optional, because an adopted checkout
+ * may have no remote. localize 0.1.0 skips such an entry as partial, with a
+ * warning, and keeps the rest; other readers of this schema were not checked.
+ *
  * Two properties are load-bearing:
  *
  * 1. **It is never repaired.** Unparseable JSON, an unknown `version` or a
@@ -108,9 +112,10 @@ export function readManifest(appRoot, io = {warn: console.warn}) {
       continue;
     }
     entries[name] = {
-      repo: value.repo,
+      ...(typeof value.repo === 'string' && value.repo ? {repo: value.repo} : {}),
       path: value.path,
       branch: value.branch,
+      ...(typeof value.subdir === 'string' ? {subdir: value.subdir} : {}),
       ...(typeof value.range === 'string' ? {range: value.range} : {}),
     };
   }
@@ -118,10 +123,15 @@ export function readManifest(appRoot, io = {warn: console.warn}) {
   return {file, exists: true, version: SCHEMA_VERSION, dir, entries, malformed};
 }
 
-/** @returns {string|null} a reason the entry is unusable, else null. */
+/**
+ * @returns {string|null} a reason the entry is unusable, else null.
+ *
+ * `repo` is optional: an adopted checkout may have no remote at all -- a
+ * package created locally that has not been pushed anywhere yet.
+ */
 function validateEntry(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return 'not an object';
-  const missing = ['repo', 'path', 'branch'].filter(
+  const missing = ['path', 'branch'].filter(
     (k) => typeof value[k] !== 'string' || value[k].length === 0,
   );
   return missing.length ? `missing ${missing.join(', ')}` : null;

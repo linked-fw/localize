@@ -67,8 +67,14 @@ export function delocalize(names, opts, deps) {
 
     delete entries[name];
 
-    const range = entry.range ?? declaredRange(name, deps) ?? 'latest';
-    deps.log(`[localize] restore the registry copy with:  npm install --no-save ${name}@${range}`);
+    const range = entry.range ?? declaredRange(name, deps);
+    if (!range && !entry.repo) {
+      // An adopted package that was never published: there is no registry copy
+      // to go back to, and `@latest` would only 404.
+      deps.log(`[localize] ${name} was never declared or published — there is no registry copy to restore.`);
+    } else {
+      deps.log(`[localize] restore the registry copy with:  npm install --no-save ${name}@${range ?? 'latest'}`);
+    }
   }
 
   writeManifest(deps.appRoot, {version: SCHEMA_VERSION, dir, packages: entries});

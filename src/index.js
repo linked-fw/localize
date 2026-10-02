@@ -6,6 +6,7 @@
  * builds the normal one.
  */
 export {localize} from './localize.js';
+export {adopt} from './adopt.js';
 export {delocalize} from './delocalize.js';
 export {list, collect} from './list.js';
 export {relink} from './relink.js';

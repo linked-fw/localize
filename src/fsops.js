@@ -9,7 +9,7 @@
  *   hard-failed an app's boot on a missing peer dependency. Module resolution
  *   happens from the symlink's REAL path, whose ancestors have no
  *   `node_modules`, so the checkout needs its own installed tree.
- * - a `postinstall` hook that invokes an install recurses.
+ * - a `postinstall` hook that invokes an install at the consumer root recurses.
  */
 import fs from 'node:fs';
 import path from 'node:path';
