@@ -1,6 +1,6 @@
 {
   "name": "@_linked/localize",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Develop an npm dependency from a git checkout: resolve the package's repository from the registry, clone it, install inside the checkout, and symlink it into node_modules -- without touching package.json or package-lock.json.",
   "keywords": [
     "npm",

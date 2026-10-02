@@ -116,6 +116,7 @@ links, always exits 0, and prints nothing at all when there is nothing to do.
 
 ```sh
 linked-localize <package…>            clone, install, link
+linked-localize adopt <package…>      install and link a checkout already in --dir
 linked-localize --list                what is localized, and whether it really is
 linked-localize --list --check        exit 1 if something recorded is not linked
 linked-localize --relink              recreate the recorded links (for postinstall)
@@ -130,7 +131,7 @@ are no short names and no aliases.
 | option | |
 |---|---|
 | `--dir <path>` | where checkouts live. Default `packages-local` |
-| `--repo <git-url>` | clone this instead of the published `repository`, and remember it |
+| `--repo <git-url>` | clone this instead of the published `repository`, and remember it. With `adopt`: record this instead of the checkout's `origin` |
 | `--subdir <path>` | where the package lives inside the repository (monorepos) |
 | `--build "<cmd>"` | run this in the checkout after installing. A failure only warns |
 | `--force` | replace a symlink pointing outside `--dir`; with `--purge`, delete anyway |
@@ -151,6 +152,27 @@ linked-localize @scope/thing --subdir packages/thing
 
 Both `--repo` and `--subdir` are written into `local-packages.json`, so you
 pass them the first time and never again.
+
+### A checkout that is already there: `adopt`
+
+`localize` gets its checkout from the registry. Some checkouts cannot come from
+there: a package you just created and have not published, perhaps with no
+remote yet, or a clone you put in `packages-local/` by hand. `adopt` takes the
+checkout as it is:
+
+```sh
+linked-localize adopt @scope/thing
+```
+
+It expects a git checkout at `packages-local/scope-thing` (the same name
+`localize` would clone to) whose `package.json` is named `@scope/thing`, and
+then does what `localize` does from the install onward: install inside it,
+build, link, record. **It never clones, pulls or fetches.** The recorded `repo`
+is the checkout's `origin`, or `--repo`, or nothing at all — a package with no
+remote relinks and lists like any other.
+
+`localize` itself suggests `adopt` when a registry lookup fails and a checkout
+is already sitting where the clone would go.
 
 ### Building the checkout
 
@@ -212,6 +234,9 @@ carries a schema version this build does not know, `localize` refuses to read
 intended, and silently resetting it is how a half-localized tree becomes
 invisible.
 
+`repo` is absent for a package adopted with no remote; `subdir` is present for
+a package that lives inside a monorepo.
+
 `range` is informational. **npm matches a linked package by name and never
 checks its version**, so a checkout at `2.0.99` satisfies `^3.0.0` as far as
 your tree is concerned and `npm ls` will not flag it. `localize` warns about
@@ -247,7 +272,7 @@ undo the first.
 ## Programmatic use
 
 ```js
-import {localize, delocalize, list, relink, defaultDeps} from '@_linked/localize';
+import {localize, adopt, delocalize, list, relink, defaultDeps} from '@_linked/localize';
 
 const deps = defaultDeps(process.cwd());
 const code = localize(['@scope/thing'], {build: 'npm run build'}, deps);
