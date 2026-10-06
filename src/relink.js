@@ -29,8 +29,16 @@ import path from 'node:path';
 import {readManifest} from './manifest.js';
 import {isSymlink, readJson, writeLink} from './fsops.js';
 import {declaredRange} from './localize.js';
+import {isProvidedByApp, pruneProvided} from './prune.js';
 
-export function relink(deps) {
+/**
+ * @param {object} deps
+ * @param {{pruneProvided?: boolean, provided?: string[]}} [opts]  with
+ *   `pruneProvided`, every checkout's own copies of what the app provides are
+ *   removed after relinking (see prune.js), and a dependency missing from a
+ *   checkout because it was pruned is not mistaken for one a root install took.
+ */
+export function relink(deps, opts = {}) {
   let manifest;
   try {
     manifest = readManifest(deps.appRoot, deps);
@@ -61,7 +69,7 @@ export function relink(deps) {
       continue;
     }
 
-    reinstallIfPruned(name, entry, deps);
+    reinstallIfPruned(name, entry, manifest.entries, opts, deps);
 
     if (isSymlink(path.join(deps.appRoot, 'node_modules', name))) {
       // Already linked; rewriting it would be noise on every install.
@@ -81,6 +89,15 @@ export function relink(deps) {
         '`linked-localize --list` for detail.',
     );
   }
+
+  if (opts.pruneProvided) {
+    try {
+      pruneProvided(manifest.entries, opts, deps);
+    } catch (e) {
+      // Never fail an install over it.
+      deps.warn(`[localize] --prune-provided failed: ${e.message}`);
+    }
+  }
   return 0;
 }
 
@@ -89,9 +106,13 @@ export function relink(deps) {
  * declared dependency (or devDependency -- the checkout's build needs those)
  * missing from it. A failure warns; the hook still exits 0.
  */
-function reinstallIfPruned(name, entry, deps) {
+function reinstallIfPruned(name, entry, entries, opts, deps) {
   const checkout = path.join(deps.appRoot, entry.path);
-  const missing = missingDependencies(checkout, cloneRootOf(entry, deps));
+  // With --prune-provided, a dependency the app provides is absent on purpose.
+  const provided = opts.pruneProvided
+    ? (dep, range, pkg) => isProvidedByApp(dep, range, pkg, entries, opts, deps)
+    : () => false;
+  const missing = missingDependencies(checkout, cloneRootOf(entry, deps), provided);
   if (!missing.length) return;
   deps.log(
     `[localize] ${name}: ${missing.length} of its dependencies are gone from ${entry.path}/node_modules ` +
@@ -112,15 +133,16 @@ function reinstallIfPruned(name, entry, deps) {
  * install hoists them. Checking only the package directory there would find
  * every hoisted dependency "missing" and reinstall on every postinstall.
  */
-function missingDependencies(checkout, cloneRoot) {
+function missingDependencies(checkout, cloneRoot, provided = () => false) {
   const pkg = readJson(path.join(checkout, 'package.json'));
   if (!pkg) return [];
-  const names = [
-    ...Object.keys(pkg.dependencies ?? {}),
-    ...Object.keys(pkg.devDependencies ?? {}),
-  ];
+  const declared = {...pkg.devDependencies, ...pkg.dependencies};
   const roots = cloneRoot === checkout ? [checkout] : [checkout, cloneRoot];
-  return names.filter((dep) => !roots.some((root) => fs.existsSync(path.join(root, 'node_modules', dep))));
+  return Object.keys(declared).filter(
+    (dep) =>
+      !roots.some((root) => fs.existsSync(path.join(root, 'node_modules', dep))) &&
+      !provided(dep, declared[dep], pkg),
+  );
 }
 
 /** The clone a `subdir` entry lives in: its path with the subdir taken off the end. */

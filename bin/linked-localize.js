@@ -36,6 +36,13 @@ Options
                      (with adopt: record this instead of the checkout's origin)
   --subdir <path>    the package's directory inside the repository (monorepos)
   --build "<cmd>"    run this in the checkout after installing; a failure only warns
+  --prune-provided   after installing (and with --relink), remove from every checkout's
+                     node_modules its own copy of a package the app provides at a version
+                     that satisfies the checkout's range: a localized sibling (always), the
+                     checkout's peerDependencies, and whatever --provided names. Keeps a
+                     copy the app's version does not satisfy, and says so
+  --provided <list>  with --prune-provided: more names to treat as the app's to provide,
+                     comma-separated; a trailing * matches a prefix ("@scope/*,react")
   --force            overwrite a symlink pointing outside --dir; with --purge, delete anyway
   --purge            with remove: also delete the checkout
   --check            with --list: exit 1 when something recorded is not linked
@@ -48,8 +55,19 @@ Exit codes
   8 the consumer's package.json or package-lock.json changed — the failure this prevents
 `.trim();
 
-const FLAGS = new Set(['--list', '--check', '--relink', '--force', '--purge', '-h', '--help', '-v', '--version']);
-const VALUED = new Set(['--dir', '--repo', '--subdir', '--build']);
+const FLAGS = new Set([
+  '--list',
+  '--check',
+  '--relink',
+  '--force',
+  '--purge',
+  '--prune-provided',
+  '-h',
+  '--help',
+  '-v',
+  '--version',
+]);
+const VALUED = new Set(['--dir', '--repo', '--subdir', '--build', '--provided']);
 
 function parse(argv) {
   const opts = {};
@@ -95,16 +113,21 @@ if (opts.v || opts.version) {
 }
 
 const deps = defaultDeps(process.cwd());
+const prune = {
+  pruneProvided: Boolean(opts['prune-provided']),
+  provided: opts.provided ? opts.provided.split(',').map((s) => s.trim()).filter(Boolean) : [],
+};
+if (opts.provided && !prune.pruneProvided) fatal('--provided only means something with --prune-provided.');
 
 if (opts.relink) {
-  process.exitCode = relink(deps);
+  process.exitCode = relink(deps, prune);
 } else if (names[0] === 'remove' || names[0] === 'delocalize') {
   process.exitCode = delocalize(names.slice(1), {purge: opts.purge, force: opts.force}, deps);
 } else if (names[0] === 'adopt') {
   if (names.length === 1) fatal('adopt needs at least one package name.');
   process.exitCode = adopt(
     names.slice(1),
-    {force: opts.force, dir: opts.dir, repo: opts.repo, build: opts.build},
+    {force: opts.force, dir: opts.dir, repo: opts.repo, build: opts.build, ...prune},
     deps,
   );
 } else if (opts.list || names.length === 0) {
@@ -112,7 +135,7 @@ if (opts.relink) {
 } else {
   process.exitCode = localize(
     names,
-    {force: opts.force, dir: opts.dir, repo: opts.repo, subdir: opts.subdir, build: opts.build},
+    {force: opts.force, dir: opts.dir, repo: opts.repo, subdir: opts.subdir, build: opts.build, ...prune},
     deps,
   );
 }
