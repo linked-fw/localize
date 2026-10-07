@@ -10,6 +10,8 @@ export {adopt} from './adopt.js';
 export {delocalize} from './delocalize.js';
 export {list, collect} from './list.js';
 export {relink} from './relink.js';
+export {pruneProvided} from './prune.js';
+export {satisfies} from './semver.js';
 export {resolvePackage, normalizeGitUrl, checkoutNameFor} from './resolve.js';
 export {readManifest, writeManifest, manifestPath, MANIFEST_FILENAME, SCHEMA_VERSION, DEFAULT_DIR} from './manifest.js';
 export {defaultDeps, makeRun} from './run.js';
