@@ -41,7 +41,7 @@ import {
 } from './errors.js';
 import {DEFAULT_DIR, SCHEMA_VERSION, readManifest, writeManifest} from './manifest.js';
 import {checkoutNameFor, resolvePackage} from './resolve.js';
-import {pruneProvided} from './prune.js';
+import {pruneProvided, shouldPrune} from './prune.js';
 import {
   diffManifests,
   isGitCheckout,
@@ -54,7 +54,8 @@ import {
 
 /**
  * @param {string[]} names  full npm package names
- * @param {object} opts  `{force, dir, repo, subdir, build, pruneProvided, provided}`
+ * @param {object} opts  `{force, dir, repo, subdir, build, prune, provided}` -- `prune`
+ *   defaults to true; see prune.js
  * @param {object} deps  `{appRoot, run, log, warn, error}`
  * @returns {number} the process exit code: the HIGHEST of the per-name codes,
  *   since each name is atomic and a failure on name 2 does not undo name 1.
@@ -101,11 +102,11 @@ export function forEachName(names, opts, deps, one) {
 
   // Over EVERY localized checkout, not just the ones named: localizing `B`
   // is what makes `A`'s registry copy of `B` redundant.
-  if (opts.pruneProvided) {
+  if (shouldPrune(opts)) {
     try {
       pruneProvided(entries, opts, deps);
     } catch (e) {
-      deps.warn(`[localize] --prune-provided failed, the checkouts' node_modules are as npm left them: ${e.message}`);
+      deps.warn(`[localize] pruning failed, the checkouts' node_modules are as npm left them: ${e.message}`);
       code = Math.max(code, EXIT_WARNED);
     }
   }

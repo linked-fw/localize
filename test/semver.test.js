@@ -1,5 +1,5 @@
 /**
- * The semver subset `--prune-provided` decides with. A wrong `true` removes a
+ * The semver subset pruning decides with. A wrong `true` removes a
  * copy a checkout needed; a wrong `false` only keeps one. So every row here
  * that expects `true` is a claim worth checking against npm's own `semver`,
  * and anything outside the subset must come back `null`, never a guess.

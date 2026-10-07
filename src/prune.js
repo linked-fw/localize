@@ -1,6 +1,9 @@
 /**
- * `--prune-provided` -- stop a checkout's own `node_modules` holding a second
- * copy of something the app already provides.
+ * Pruning -- stop a checkout's own `node_modules` holding a second copy of
+ * something the app already provides. On by default after every install in a
+ * checkout and on every `--relink`; `--no-prune` (`{prune: false}`) skips it.
+ *
+ * `shouldPrune(opts)` is the one place that default lives.
  *
  * Why it is needed. `npm install` inside a checkout (localize.js, step 3)
  * installs what the CHECKOUT's lockfile says: its own copy of every
@@ -31,13 +34,19 @@
  *
  * Never removed, candidate or not:
  *
- * - a package with a `bin` -- that is tooling the checkout's scripts and
- *   `npm exec` look up in the checkout's own `node_modules/.bin`;
  * - a copy whose ranges the app's version does not satisfy -- kept, with a
  *   warning naming the package, the range and the app's version;
  * - anything in a checkout that is not under the app root, because then the
  *   upward search never reaches the app's `node_modules` and the removed
  *   package would simply be missing.
+ *
+ * A package with a `bin` is NOT exempt. Measured in a checkout under an app
+ * root with its own `@_linked/cli` removed: `npx linked build`,
+ * `npm exec linked -- --help`, a script running `npm exec linked` and a script
+ * running a bare `linked` all resolved `linked` to the app root's copy,
+ * because npm puts every ancestor's `node_modules/.bin` on the PATH. The
+ * removed package's links in the checkout's `node_modules/.bin` are removed
+ * with it, so nothing dangles.
  *
  * It never runs npm and never touches the checkout's `package.json` or
  * `package-lock.json`. `npm install` in the checkout puts the copies back;
@@ -48,6 +57,11 @@ import path from 'node:path';
 
 import {isInside, isSymlink, readJson} from './fsops.js';
 import {satisfies} from './semver.js';
+
+/** Pruning is on unless a caller says `{prune: false}`. */
+export function shouldPrune(opts = {}) {
+  return opts.prune !== false;
+}
 
 const REQUIRE_FIELDS = ['dependencies', 'peerDependencies', 'optionalDependencies'];
 const DECLARE_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
@@ -111,7 +125,6 @@ function pruneOne(nm, ctx) {
     const dir = path.join(nm, dep);
     const nested = readJson(path.join(dir, 'package.json'));
     if (!nested) continue;
-    if (nested.bin) continue; // tooling: see the module header
     const app = appCopy(dep, deps);
     if (!app) continue; // the app does not provide it, so this copy is the only one
     if (realOrSelf(dir) === app.real) continue; // already the app's copy
@@ -130,6 +143,7 @@ function pruneOne(nm, ctx) {
 
     fs.rmSync(dir, {recursive: true, force: true});
     removeEmptyScope(nm, dep);
+    removeBinLinksInto(nm, dir);
     removed.push({
       owner: entry.path,
       dep,
@@ -257,6 +271,23 @@ function topLevelPackages(nm) {
     }
   }
   return out;
+}
+
+/** Links in `<nm>/.bin` that pointed into a package just removed: dangling now. */
+function removeBinLinksInto(nm, removedDir) {
+  const bin = path.join(nm, '.bin');
+  let names;
+  try {
+    names = fs.readdirSync(bin);
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    const link = path.join(bin, name);
+    if (!isSymlink(link)) continue;
+    const target = path.resolve(bin, fs.readlinkSync(link));
+    if (isInside(target, removedDir)) fs.unlinkSync(link);
+  }
 }
 
 function removeEmptyScope(nm, dep) {

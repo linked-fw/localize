@@ -1,5 +1,5 @@
 /**
- * `--prune-provided`: a checkout's own copy of something the app provides is
+ * Pruning, on by default: a checkout's own copy of something the app provides is
  * removed, so Node's upward search reaches the app's copy -- and only then.
  *
  * Real filesystem, stubbed subprocesses: what is being asserted is which
@@ -19,7 +19,7 @@ import {writeManifest} from '../src/manifest.js';
 import {checkoutNameFor} from '../src/resolve.js';
 import {makeConsumer, ok, rm, stubbed, tmpdir} from './helpers.js';
 
-const PROVIDED = {pruneProvided: true, provided: ['@fw/*']};
+const PROVIDED = {provided: ['@fw/*']};
 
 function consumer(t) {
   const root = makeConsumer();
@@ -52,6 +52,13 @@ function checkout(appRoot, name, json, {dir = path.join(appRoot, 'packages-local
 /** A copy inside a checkout's own node_modules, as `npm install` in the checkout leaves it. */
 const nested = (co, name, version, extra = {}) => pkgAt(path.join(co, 'node_modules', name), {name, version, ...extra});
 const has = (co, name) => fs.existsSync(path.join(co, 'node_modules', name));
+const isLink = (p) => {
+  try {
+    return fs.lstatSync(p).isSymbolicLink();
+  } catch {
+    return false;
+  }
+};
 
 const record = (appRoot, map) =>
   writeManifest(appRoot, {
@@ -77,7 +84,7 @@ function twoSiblings(t) {
   return {appRoot, a, b};
 }
 
-test('localize --prune-provided removes, from EVERY checkout, the copies the app provides', (t) => {
+test('localize removes, from EVERY checkout, the copies the app provides — by default', (t) => {
   const {appRoot, a, b} = twoSiblings(t);
   const deps = stubbed(appRoot);
 
@@ -93,10 +100,10 @@ test('localize --prune-provided removes, from EVERY checkout, the copies the app
   assert.equal(deps.npmCalls().filter((c) => c.cwd === appRoot).length, 0, 'never npm at the root');
 });
 
-test('without --prune-provided nothing is removed — the behaviour before the flag', (t) => {
+test('--no-prune ({prune: false}) removes nothing — the behaviour of 0.2', (t) => {
   const {appRoot, a, b} = twoSiblings(t);
   const deps = stubbed(appRoot);
-  assert.equal(adopt(['@fw/b'], {dir: 'packages-local'}, deps), 0, deps.output());
+  assert.equal(adopt(['@fw/b'], {...PROVIDED, prune: false, dir: 'packages-local'}, deps), 0, deps.output());
   assert.ok(has(a, '@fw/b'));
   assert.ok(has(a, '@fw/core'));
   assert.ok(has(b, '@fw/core'));
@@ -128,18 +135,18 @@ test('a range from ANOTHER installed package that would load the copy counts too
   record(appRoot, {'@fw/a': a});
 
   const deps = stubbed(appRoot);
-  relink(deps, {pruneProvided: true, provided: ['@fw/core']});
+  relink(deps, {provided: ['@fw/core']});
   assert.ok(has(a, '@fw/core'));
   assert.match(deps.warns.join('\n'), /@fw\/ui@1\.0\.0 asks @fw\/core@\^2\.30\.0, and the app has @fw\/core@2\.25\.0/);
 
   // ...but not when that package has its own copy, which it then loads instead.
   nested(path.join(a, 'node_modules', '@fw/ui'), '@fw/core', '2.30.0');
   const again = stubbed(appRoot);
-  relink(again, {pruneProvided: true, provided: ['@fw/core']});
+  relink(again, {provided: ['@fw/core']});
   assert.equal(has(a, '@fw/core'), false, again.output());
 });
 
-test('only candidates go: tooling with a bin, unlisted packages and what the app lacks all stay', (t) => {
+test('only candidates go: unlisted packages and what the app lacks stay; a bin is no exemption', (t) => {
   const appRoot = consumer(t);
   appHas(appRoot, '@fw/cli', '1.39.0', {bin: {fw: 'bin.js'}});
   appHas(appRoot, 'typescript', '5.9.3');
@@ -152,11 +159,19 @@ test('only candidates go: tooling with a bin, unlisted packages and what the app
   nested(a, 'typescript', '5.9.3');
   nested(a, '@fw/only-here', '1.0.0');
   nested(a, 'react', '19.0.0');
+  const bin = path.join(a, 'node_modules', '.bin');
+  fs.mkdirSync(bin, {recursive: true});
+  fs.symlinkSync('../@fw/cli/bin.js', path.join(bin, 'fw'));
+  fs.symlinkSync('../typescript/bin/tsc', path.join(bin, 'tsc'));
   record(appRoot, {'@fw/a': a});
 
   const deps = stubbed(appRoot);
   relink(deps, PROVIDED);
-  assert.ok(has(a, '@fw/cli'), 'a package with a bin is tooling the checkout runs from its own .bin');
+  // npm puts every ancestor's node_modules/.bin on the PATH, so the app's `fw` is
+  // found from inside the checkout -- measured with `npx`, `npm exec`, `npm run`.
+  assert.equal(has(a, '@fw/cli'), false, 'tooling with a bin is pruned like anything else');
+  assert.equal(fs.existsSync(path.join(bin, 'fw')) || isLink(path.join(bin, 'fw')), false, 'its .bin link goes with it');
+  assert.ok(isLink(path.join(bin, 'tsc')), 'other packages keep theirs');
   assert.ok(has(a, 'typescript'), 'not a candidate: neither listed, nor a peer, nor a sibling');
   assert.ok(has(a, '@fw/only-here'), 'the app does not provide it, so this is the only copy');
   assert.equal(has(a, 'react'), false, 'a peerDependency is the host\'s to provide, with no list needed');
@@ -170,12 +185,12 @@ test('a localized sibling always counts as provided; a range it misses is said, 
   record(appRoot, {'@fw/a': a, '@fw/b': b});
 
   const deps = stubbed(appRoot);
-  relink(deps, {pruneProvided: true}); // no `provided` list: siblings need none
+  relink(deps); // no options at all: siblings need no list, and pruning is the default
   assert.equal(has(a, '@fw/b'), false);
   assert.match(deps.warns.join('\n'), /@fw\/a asks @fw\/b@\^1\.0\.0; the localized checkout is 2\.0\.0/);
 });
 
-test('relink --prune-provided does not reinstall a checkout for a copy it pruned on purpose', (t) => {
+test('relink does not reinstall a checkout for a copy it pruned on purpose', (t) => {
   const appRoot = consumer(t);
   appHas(appRoot, '@fw/core', '2.25.0');
   const a = checkout(appRoot, '@fw/a', {dependencies: {'@fw/core': '^2.22.8'}, devDependencies: {tool: '1'}});
@@ -186,14 +201,14 @@ test('relink --prune-provided does not reinstall a checkout for a copy it pruned
   assert.equal(relink(deps, PROVIDED), 0);
   assert.equal(deps.npmCalls().length, 0, `a postinstall must stay silent and fast\n${deps.output()}`);
 
-  // Without the flag, the same tree reads as pruned by a root install -- as before.
+  // With --no-prune, the same tree reads as pruned by a root install -- as in 0.2.
   const plain = stubbed(appRoot);
-  relink(plain);
+  relink(plain, {...PROVIDED, prune: false});
   assert.equal(plain.npmCalls().length, 1);
   assert.equal(plain.npmCalls()[0].cwd, a);
 });
 
-test('relink --prune-provided reinstalls when a pruned dependency is NOT provided, then prunes', (t) => {
+test('relink reinstalls when a pruned dependency is NOT provided, then prunes', (t) => {
   const appRoot = consumer(t);
   appHas(appRoot, '@fw/core', '2.25.0');
   const a = checkout(appRoot, '@fw/a', {dependencies: {'@fw/core': '^2.22.8', tool: '1'}});
@@ -231,7 +246,7 @@ test('a checkout outside the app root is left alone: Node would never reach the 
   assert.match(deps.output(), /outside the app root/);
 });
 
-test('localize itself passes the flag through: the named package and its siblings are pruned', (t) => {
+test('localize itself prunes: the named package and its siblings', (t) => {
   const {appRoot, a, b} = twoSiblings(t);
   const deps = stubbed(appRoot);
   // B already sits where the clone would go, so localize refreshes it instead of cloning.

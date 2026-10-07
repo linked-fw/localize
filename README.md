@@ -52,6 +52,7 @@ npm package name
   → the published `repository` field           (data, not a guess)
   → git clone into packages-local/<name>
   → npm install INSIDE the checkout            (not from your project)
+  → prune what the app already provides        (one copy of each; --no-prune skips)
   → fs.symlink node_modules/<name> → checkout  (not npm link)
   → record it in local-packages.json           (gitignored)
 ```
@@ -141,8 +142,8 @@ are no short names and no aliases.
 | `--repo <git-url>` | clone this instead of the published `repository`, and remember it. With `adopt`: record this instead of the checkout's `origin` |
 | `--subdir <path>` | where the package lives inside the repository (monorepos) |
 | `--build "<cmd>"` | run this in the checkout after installing. A failure only warns |
-| `--prune-provided` | remove each checkout's own copy of a package the app provides — see [below](#one-copy-of-what-the-app-provides---prune-provided). Off by default; works with `--relink` too |
-| `--provided <list>` | with `--prune-provided`: more names the app provides, comma-separated, a trailing `*` matching a prefix (`"@scope/*,react,react-dom"`) |
+| `--provided <list>` | more names the app provides, comma-separated, a trailing `*` matching a prefix (`"@scope/*,react,react-dom"`) — see [pruning](#one-copy-of-what-the-app-provides-pruning) |
+| `--no-prune` | leave every checkout's `node_modules` exactly as npm installed it; also with `--relink` |
 | `--force` | replace a symlink pointing outside `--dir`; with `--purge`, delete anyway |
 
 ### Packages published from a monorepo
@@ -197,7 +198,7 @@ package whose build is broken is usually exactly the thing you are about to
 fix. Many projects need nothing here, because their dev server reads the
 checkout's source directly.
 
-### One copy of what the app provides: `--prune-provided`
+### One copy of what the app provides (pruning)
 
 The install inside a checkout installs what the *checkout's* lockfile says,
 which includes its own copy of everything it depends on — often an older one
@@ -210,13 +211,9 @@ depends on `B`:
 - a package that must be loaded once — React, or anything that keeps a registry
   of classes — is loaded once per copy.
 
-```sh
-linked-localize @scope/b --prune-provided --provided "@scope/*,react,react-dom"
-```
-
-After installing, and on every `--relink` that passes it, this goes over
-**every** localized checkout and removes a package from the top of its
-`node_modules` when all of these hold:
+So after installing, and on every `--relink`, `localize` goes over **every**
+localized checkout and removes a package from the top of its `node_modules`
+when all of these hold:
 
 - it is a candidate: a localized sibling, one of the checkout's
   `peerDependencies`, or a name `--provided` matches;
@@ -224,17 +221,27 @@ After installing, and on every `--relink` that passes it, this goes over
 - your app's version satisfies every range that would load that copy — the
   checkout's own, and that of any installed package without a copy of its own.
   A localized sibling counts as provided whatever its version, and a range it
-  misses is reported, not acted on;
-- it declares no `bin` (tooling the checkout's scripts run from its own
-  `node_modules/.bin`).
+  misses is reported, not acted on.
+
+```sh
+linked-localize @scope/b --provided "@scope/*,react,react-dom"   # widen the candidates
+linked-localize @scope/b --no-prune                              # leave node_modules as npm left it
+```
 
 Node's upward search then reaches your app's copy, because the checkout sits
-under your app's root. A copy that fails a check is kept, and a range your
-app's version misses is printed with the package, the range and both versions.
-A checkout outside your app's root is never touched. Nothing is written to the
-checkout's `package.json` or `package-lock.json`; an `npm install` in the
-checkout puts the copies back, and the next run takes them out again. With the
-flag, `--relink` does not mistake a pruned copy for one a root install removed.
+under your app's root. That includes binaries: npm puts every ancestor's
+`node_modules/.bin` on the `PATH` for `npx`, `npm exec` and `npm run`, so a
+checkout whose own copy of a tool was removed runs your app's. The removed
+package's links in the checkout's `node_modules/.bin` go with it.
+
+A copy that fails a check is kept, and a range your app's version misses is
+printed with the package, the range and both versions. A checkout outside your
+app's root is never touched. Nothing is written to the checkout's
+`package.json` or `package-lock.json`; an `npm install` in the checkout puts
+the copies back, and the next run takes them out again. `--relink` does not
+mistake a pruned copy for one a root install removed. Inside the checkout,
+`npm ls` reports the removed packages as `UNMET DEPENDENCY`; that is npm not
+looking above the package's own root, not a broken checkout.
 
 ## `linked-localize --list`
 
@@ -311,7 +318,8 @@ undo the first.
 ## What it never does
 
 - run an install against *your* project
-- remove anything from a checkout's `node_modules` unless you pass `--prune-provided`
+- remove anything from a checkout's `node_modules` but a copy of what your app
+  provides (and never with `--no-prune`)
 - edit `package.json`, `package-lock.json`, `.gitignore`, `workspaces`, or any
   bundler configuration
 - invoke `npm link`

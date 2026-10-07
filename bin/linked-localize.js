@@ -36,18 +36,21 @@ Options
                      (with adopt: record this instead of the checkout's origin)
   --subdir <path>    the package's directory inside the repository (monorepos)
   --build "<cmd>"    run this in the checkout after installing; a failure only warns
-  --prune-provided   after installing (and with --relink), remove from every checkout's
-                     node_modules its own copy of a package the app provides at a version
-                     that satisfies the checkout's range: a localized sibling (always), the
-                     checkout's peerDependencies, and whatever --provided names. Keeps a
-                     copy the app's version does not satisfy, and says so
-  --provided <list>  with --prune-provided: more names to treat as the app's to provide,
-                     comma-separated; a trailing * matches a prefix ("@scope/*,react")
+  --provided <list>  more names the app provides, comma-separated; a trailing * matches
+                     a prefix ("@scope/*,react"). See "Pruning" below
+  --no-prune         leave every checkout's node_modules exactly as npm installed it
   --force            overwrite a symlink pointing outside --dir; with --purge, delete anyway
   --purge            with remove: also delete the checkout
   --check            with --list: exit 1 when something recorded is not linked
   -h, --help         this
   -v, --version      print the version
+
+Pruning
+  After installing, and on every --relink, each checkout's own copy of a package the
+  app provides is removed from its node_modules when the app's version satisfies the
+  checkout's range, so Node reaches the app's copy: a localized sibling (always), the
+  checkout's peerDependencies, and whatever --provided names. A copy the app's version
+  does not satisfy is kept, and said so. --no-prune turns this off.
 
 Exit codes
   0 ok · 1 --check found a problem · 3 unusable manifest · 4 no repository resolved
@@ -61,7 +64,7 @@ const FLAGS = new Set([
   '--relink',
   '--force',
   '--purge',
-  '--prune-provided',
+  '--no-prune',
   '-h',
   '--help',
   '-v',
@@ -114,10 +117,10 @@ if (opts.v || opts.version) {
 
 const deps = defaultDeps(process.cwd());
 const prune = {
-  pruneProvided: Boolean(opts['prune-provided']),
+  prune: !opts['no-prune'],
   provided: opts.provided ? opts.provided.split(',').map((s) => s.trim()).filter(Boolean) : [],
 };
-if (opts.provided && !prune.pruneProvided) fatal('--provided only means something with --prune-provided.');
+if (opts.provided && !prune.prune) fatal('--provided means nothing with --no-prune.');
 
 if (opts.relink) {
   process.exitCode = relink(deps, prune);

@@ -1,6 +1,6 @@
 /**
  * Just enough semver to answer one question: does the app's installed version
- * satisfy the range a checkout declares? `--prune-provided` removes a
+ * satisfy the range a checkout declares? pruning (prune.js) removes a
  * checkout's own copy of a package only when the answer is yes.
  *
  * localize has no dependencies, so this is a deliberate subset rather than

@@ -29,14 +29,14 @@ import path from 'node:path';
 import {readManifest} from './manifest.js';
 import {isSymlink, readJson, writeLink} from './fsops.js';
 import {declaredRange} from './localize.js';
-import {isProvidedByApp, pruneProvided} from './prune.js';
+import {isProvidedByApp, pruneProvided, shouldPrune} from './prune.js';
 
 /**
  * @param {object} deps
- * @param {{pruneProvided?: boolean, provided?: string[]}} [opts]  with
- *   `pruneProvided`, every checkout's own copies of what the app provides are
- *   removed after relinking (see prune.js), and a dependency missing from a
- *   checkout because it was pruned is not mistaken for one a root install took.
+ * @param {{prune?: boolean, provided?: string[]}} [opts]  unless `prune` is
+ *   false, every checkout's own copies of what the app provides are removed
+ *   after relinking (see prune.js), and a dependency missing from a checkout
+ *   because it was pruned is not mistaken for one a root install took.
  */
 export function relink(deps, opts = {}) {
   let manifest;
@@ -90,12 +90,12 @@ export function relink(deps, opts = {}) {
     );
   }
 
-  if (opts.pruneProvided) {
+  if (shouldPrune(opts)) {
     try {
       pruneProvided(manifest.entries, opts, deps);
     } catch (e) {
       // Never fail an install over it.
-      deps.warn(`[localize] --prune-provided failed: ${e.message}`);
+      deps.warn(`[localize] pruning failed: ${e.message}`);
     }
   }
   return 0;
@@ -108,8 +108,8 @@ export function relink(deps, opts = {}) {
  */
 function reinstallIfPruned(name, entry, entries, opts, deps) {
   const checkout = path.join(deps.appRoot, entry.path);
-  // With --prune-provided, a dependency the app provides is absent on purpose.
-  const provided = opts.pruneProvided
+  // When pruning, a dependency the app provides is absent on purpose.
+  const provided = shouldPrune(opts)
     ? (dep, range, pkg) => isProvidedByApp(dep, range, pkg, entries, opts, deps)
     : () => false;
   const missing = missingDependencies(checkout, cloneRootOf(entry, deps), provided);
