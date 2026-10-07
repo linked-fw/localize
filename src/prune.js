@@ -30,7 +30,8 @@
  *   not satisfy is said out loud, never acted on;
  * - the checkout's **peerDependencies** -- by definition, the host's to provide;
  * - anything matching `provided` -- names or `@scope/*` patterns the caller
- *   passes (`@_linked/cli` passes its framework scope plus react/react-dom).
+ *   passes (`@_linked/cli` passes the names of the app's installed linked
+ *   packages plus react/react-dom).
  *
  * Never removed, candidate or not:
  *
