@@ -31,7 +31,29 @@ if (!branch) {
 // 3. The tarball holds every tracked file the `files` field selects -- and
 // explicitly src/prune.js, the file 0.3.0 was missing.
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
-const [pack] = JSON.parse(run('npm', ['pack', '--dry-run', '--json', '--ignore-scripts']));
+// Ask the npm that is running this publish, not whichever `npm` is on PATH:
+// the two can be different majors with different `pack --json` output.
+const execpath = process.env.npm_execpath;
+const npm = execpath
+  ? /\.[cm]?js$/.test(execpath)
+    ? [process.execPath, [execpath]]
+    : [execpath, []]
+  : ['npm', []];
+const packJson = JSON.parse(
+  run(npm[0], [...npm[1], 'pack', '--dry-run', '--json', '--ignore-scripts']),
+);
+// npm <= 11 prints an array of results; npm 12 prints an object keyed by
+// package name. Accept either, and a bare result object too.
+const results = Array.isArray(packJson)
+  ? packJson
+  : Array.isArray(packJson?.files)
+    ? [packJson]
+    : Object.values(packJson ?? {});
+const pack = results.find((r) => r?.name === pkg.name) ?? results[0];
+if (!Array.isArray(pack?.files)) {
+  console.error(`prepublish-check: cannot read the file list from npm pack --json:\n${JSON.stringify(packJson).slice(0, 500)}`);
+  process.exit(1);
+}
 const packed = new Set(pack.files.map((f) => f.path));
 const tracked = run('git', ['ls-files', '--', ...pkg.files]).split('\n').filter(Boolean);
 const missing = [...new Set([...tracked, 'src/prune.js'])].filter((f) => !packed.has(f));
