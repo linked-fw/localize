@@ -354,6 +354,16 @@ consumer's. That single assertion is what stops someone simplifying the install
 back to the project root, which is the one change that would quietly break
 every consumer.
 
+## Publishing
+
+`npm publish` runs `scripts/prepublish-check.js` first, which refuses unless the
+working tree is clean, `HEAD` is the remote default branch after a fetch, and
+the tarball holds every tracked file the `files` field selects. Publish from an
+up-to-date `main`, never from a branch.
+
+0.3.0 was published from a stale checkout and shipped without the prune code;
+it is deprecated. Use 0.3.1 or later.
+
 ## License
 
 MIT
